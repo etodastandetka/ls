@@ -9,7 +9,6 @@ import { initTelegramWebApp, syncWithBot, TelegramUser, getTelegramUser, clearTe
 import { ReferralIcon, HistoryIcon, InstructionIcon, SupportIcon } from "../components/Icons"
 import UserProfile from "../components/UserProfile"
 import RatingBlock from "../components/RatingBlock"
-import Achievements from "../components/Achievements"
 import TelegramLoginWidget from "../components/TelegramLoginWidget"
 
 function HolidayEffects() {
@@ -639,7 +638,6 @@ export default function HomePage() {
         </section>
 
         <RatingBlock />
-        <Achievements />
       </div>
 
       <style jsx global>{`
