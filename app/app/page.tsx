@@ -513,20 +513,6 @@ export default function HomePage() {
         )}
         <UserProfile />
 
-        <section className="wb-hero">
-          <div className="wb-hero-top">
-            <div className="wb-hero-title">
-              <h1 className="wb-h1">
-                {greeting}
-                {user ? `, ${user.first_name}` : ""}!
-              </h1>
-            </div>
-
-          </div>
-
-          <div className="wb-hero-sheen" aria-hidden="true" />
-        </section>
-
         <section className="wb-section">
           <div className="wb-section-head">
             <h2 className="wb-h2">{t.quickActions}</h2>
