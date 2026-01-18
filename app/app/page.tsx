@@ -6,7 +6,6 @@ import FixedHeaderControls from "../components/FixedHeaderControls"
 import { useLanguage } from "../components/LanguageContext"
 import { useBotSettings } from "../components/SettingsLoader"
 import { initTelegramWebApp, syncWithBot, TelegramUser, getTelegramUser, clearTelegramUserCache } from "../utils/telegram"
-import { useHomePageData } from "../hooks/useHomePageData"
 import { ReferralIcon, HistoryIcon, InstructionIcon, SupportIcon } from "../components/Icons"
 import UserProfile from "../components/UserProfile"
 import RatingBlock from "../components/RatingBlock"
@@ -369,25 +368,8 @@ export default function HomePage() {
     return language === "en" ? "Good night" : "Доброй ночи"
   }, [language])
 
-  const { transactions, loading: transactionsLoading } = useHomePageData()
-
-  // Вычисляем статистику напрямую из транзакций - всегда актуально
-  const computedStats = useMemo(() => {
-    let deposits = 0
-    let withdraws = 0
-    for (let i = 0; i < transactions.length; i++) {
-      const t: any = transactions[i]
-      const rawType = t?.type || t?.requestType || t?.request_type
-      const type = typeof rawType === "string" ? rawType.toLowerCase() : ""
-      if (type === "deposit") deposits++
-      else if (type === "withdraw" || type === "withdrawal") withdraws++
-    }
-    return { deposits, withdraws }
-  }, [transactions])
-
   const translations = {
     ru: {
-      subtitle: "Платформа для пополнения и вывода средств в казино",
       deposit: "Пополнить",
       withdraw: "Вывести",
       referral: "Рефералы",
@@ -397,13 +379,10 @@ export default function HomePage() {
       quickActions: "Быстрые действия",
       services: "Сервисы",
       activity: "Активность",
-      depCount: "Пополнений",
-      wdrCount: "Выводов",
       secure: "Защита",
       open: "Открыть",
     },
     en: {
-      subtitle: "Platform for deposits and withdrawals in casinos",
       deposit: "Deposit",
       withdraw: "Withdraw",
       referral: "Referrals",
@@ -413,8 +392,6 @@ export default function HomePage() {
       quickActions: "Quick Actions",
       services: "Services",
       activity: "Activity",
-      depCount: "Deposits",
-      wdrCount: "Withdrawals",
       secure: "Security",
       open: "Open",
     },
@@ -543,20 +520,8 @@ export default function HomePage() {
                 {greeting}
                 {user ? `, ${user.first_name}` : ""}!
               </h1>
-              <p className="wb-p">{t.subtitle}</p>
             </div>
 
-          </div>
-
-          <div className="wb-hero-cards">
-            <div className="wb-mini">
-              <div className="wb-mini-label">{t.depCount}</div>
-              <div className="wb-mini-value">{computedStats.deposits}</div>
-            </div>
-            <div className="wb-mini">
-              <div className="wb-mini-label">{t.wdrCount}</div>
-              <div className="wb-mini-value">{computedStats.withdraws}</div>
-            </div>
           </div>
 
           <div className="wb-hero-sheen" aria-hidden="true" />
@@ -579,7 +544,6 @@ export default function HomePage() {
                   </div>
                   <div className="wb-primary-text">
                     <div className="wb-primary-title">{t.deposit}</div>
-                    <div className="wb-primary-sub">{language === "en" ? "Instant top up" : "Мгновенное пополнение"}</div>
                   </div>
                 </div>
                 <div className="wb-primary-cta">
@@ -602,7 +566,6 @@ export default function HomePage() {
                   </div>
                   <div className="wb-primary-text">
                     <div className="wb-primary-title">{t.withdraw}</div>
-                    <div className="wb-primary-sub">{language === "en" ? "Fast payout" : "Быстрый вывод"}</div>
                   </div>
                 </div>
                 <div className="wb-primary-cta">
