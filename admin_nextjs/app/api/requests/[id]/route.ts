@@ -351,10 +351,13 @@ export async function PATCH(
       if (requestBeforeUpdate.userId) {
         let notificationMessage = ''
         
-        const closedDuration = formatDuration(
-          requestBeforeUpdate.createdAt,
-          updateData.processedAt || updatedRequest.processedAt || new Date()
-        )
+        const isAutoDepositStatus = body.status === 'autodeposit_success' || body.status === 'auto_completed'
+        const closedDuration = isAutoDepositStatus
+          ? '1с'
+          : formatDuration(
+              requestBeforeUpdate.createdAt,
+              updateData.processedAt || updatedRequest.processedAt || new Date()
+            )
 
         if (body.status === 'completed' || body.status === 'approved' || body.status === 'autodeposit_success' || body.status === 'auto_completed') {
           if (requestBeforeUpdate.requestType === 'deposit') {

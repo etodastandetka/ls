@@ -65,6 +65,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 # URL сайта
 WEBSITE_URL = os.getenv("MINI_APP_URL", "https://lux-on.org")
 API_URL = os.getenv("ADMIN_PUBLIC_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://pipiska.net"))
+SUPPORT_BOT_URL = os.getenv("SUPPORT_BOT_URL", "https://t.me/operator_luxon_bot")
 
 # Словарь для хранения состояний пользователей
 user_states = {}
@@ -841,9 +842,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 parse_mode='HTML'
             )
         elif message_text == btn_support:
-            # Отправляем webapp ссылку на тех поддержку
+            # Отправляем ссылку на бота техподдержки
             keyboard = [
-                [InlineKeyboardButton("🚀 Открыть поддержку", web_app=WebAppInfo(url=f"{WEBSITE_URL}/support"))]
+                [InlineKeyboardButton("🚀 Открыть поддержку", url=SUPPORT_BOT_URL)]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(

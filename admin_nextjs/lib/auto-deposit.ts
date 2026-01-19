@@ -467,7 +467,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
             return `${hours}ч ${remMinutes}м`
           }
 
-          const closedDuration = formatDuration(fullRequest.createdAt, fullRequest.processedAt || new Date())
+          const closedDuration = '1с'
           const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
             `💰 Сумма: ${fullRequest.amount} сом\n` +
             `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}` +

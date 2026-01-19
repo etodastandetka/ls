@@ -551,7 +551,7 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
             consecutiveNetworkErrors = 0
             console.error('Error in quick polling:', error.message || error)
           }
-        }, 5000) // Проверка каждые 5 секунд вместо 60
+        }, 1000) // Проверка каждую секунду для быстрого автопополнения
         
         // Keepalive: каждые 29 минут проверяем соединение
         keepAliveInterval = setInterval(() => {
