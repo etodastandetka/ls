@@ -163,20 +163,68 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
 
   // Оптимизированная обработка: все в одной транзакции для максимальной скорости
   try {
+    // КРИТИЧЕСКИ ВАЖНО: Атомарная проверка - используем транзакцию для блокировки строки
+    // Это предотвращает дублирование пополнений в казино при параллельных вызовах
+    const preCheckResult = await prisma.$transaction(async (tx) => {
+      // Проверяем текущее состояние заявки и платежа атомарно
+      const [currentRequest, currentPayment] = await Promise.all([
+        tx.request.findUnique({
+          where: { id: request.id },
+          select: { status: true, processedBy: true },
+        }),
+        tx.incomingPayment.findUnique({
+          where: { id: paymentId },
+          select: { isProcessed: true, requestId: true },
+        }),
+      ])
+      
+      // Если платеж уже обработан - пропускаем
+      if (currentPayment?.isProcessed) {
+        return { skip: true, reason: 'payment_already_processed' }
+      }
+      
+      // Если заявка уже обработана автопополнением - пропускаем пополнение
+      if (currentRequest?.status === 'autodeposit_success' || 
+          currentRequest?.status === 'auto_completed' ||
+          currentRequest?.processedBy === 'автопополнение') {
+        // Все равно привязываем платеж к заявке
+        await tx.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        return { skip: true, reason: 'request_already_processed', paymentLinked: true }
+      }
+      
+      return { skip: false }
+    })
+    
+    if (preCheckResult.skip) {
+      console.log(`⚠️ [Auto-Deposit] Request ${request.id} skipped: ${preCheckResult.reason}`)
+      return {
+        requestId: request.id,
+        success: true,
+        statusUpdated: false,
+        paymentLinked: preCheckResult.paymentLinked || false,
+        skipped: true,
+        reason: preCheckResult.reason
+      }
+    }
+    
     const { depositToCasino } = await import('./deposit-balance')
     
-    // ВАЖНО: Проверяем текущий статус заявки перед пополнением
-    // Если заявка уже completed/approved, сначала обновляем статус на autodeposit_success,
-    // чтобы depositToCasino не считал её дубликатом
-    const currentRequestStatus = await prisma.request.findUnique({
+    // Получаем текущий статус для проверки перед пополнением
+    const requestStatusBeforeDeposit = await prisma.request.findUnique({
       where: { id: request.id },
       select: { status: true },
     })
     
     // Если заявка уже completed/approved, временно обновляем статус на pending,
     // чтобы depositToCasino не считал её дубликатом
-    if (currentRequestStatus?.status === 'completed' || currentRequestStatus?.status === 'approved') {
-      console.log(`⚠️ [Auto-Deposit] Request ${request.id} already ${currentRequestStatus.status}, temporarily updating to pending for deposit check`)
+    if (requestStatusBeforeDeposit?.status === 'completed' || requestStatusBeforeDeposit?.status === 'approved') {
+      console.log(`⚠️ [Auto-Deposit] Request ${request.id} already ${requestStatusBeforeDeposit.status}, temporarily updating to pending for deposit check`)
       await prisma.request.update({
         where: { id: request.id },
         data: {
@@ -200,11 +248,11 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       console.error(`❌ [Auto-Deposit] Deposit failed: ${errorMessage}`)
       
       // Восстанавливаем исходный статус если был изменен
-      if (currentRequestStatus?.status === 'completed' || currentRequestStatus?.status === 'approved') {
+      if (requestStatusBeforeDeposit?.status === 'completed' || requestStatusBeforeDeposit?.status === 'approved') {
         await prisma.request.update({
           where: { id: request.id },
           data: {
-            status: currentRequestStatus.status as any,
+            status: requestStatusBeforeDeposit.status as any,
             updatedAt: new Date(),
           } as any,
         })
@@ -432,70 +480,6 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       console.log(`✅ [Auto-Deposit] SUCCESS: Payment ${paymentId} linked to request ${request.id} (verified)`)
     }
 
-    // Отправляем уведомление пользователю в бот, если заявка создана через бот
-    try {
-      const fullRequest = await prisma.request.findUnique({
-        where: { id: request.id },
-        select: {
-          userId: true,
-          source: true,
-          amount: true,
-          bookmaker: true,
-          createdAt: true,
-          processedAt: true,
-        },
-      })
-      
-      if (fullRequest) {
-        const source = (fullRequest as any).source
-        const isFromBot = source === 'bot' || !source
-        
-        if (isFromBot && fullRequest.userId) {
-          const formatDuration = (start?: Date | string | null, end?: Date | string | null) => {
-            if (!start || !end) return null
-            const startDate = typeof start === 'string' ? new Date(start) : start
-            const endDate = typeof end === 'string' ? new Date(end) : end
-            const diffMs = endDate.getTime() - startDate.getTime()
-            if (Number.isNaN(diffMs) || diffMs < 0) return null
-            const totalSeconds = Math.round(diffMs / 1000)
-            if (totalSeconds < 60) return `${totalSeconds}с`
-            const minutes = Math.floor(totalSeconds / 60)
-            const seconds = totalSeconds % 60
-            if (minutes < 60) return `${minutes}м ${seconds}с`
-            const hours = Math.floor(minutes / 60)
-            const remMinutes = minutes % 60
-            return `${hours}ч ${remMinutes}м`
-          }
-
-          const closedDuration = '1с'
-          const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
-            `💰 Сумма: ${fullRequest.amount} сом\n` +
-            `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}` +
-            (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
-          
-          // Импортируем функцию отправки уведомления
-          const botToken = process.env.BOT_TOKEN
-          if (botToken) {
-            const sendMessageUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
-            fetch(sendMessageUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: fullRequest.userId.toString(),
-                text: notificationMessage,
-                parse_mode: 'HTML',
-              }),
-            }).catch(error => {
-              console.error(`❌ Failed to send notification for request ${request.id}:`, error)
-            })
-          }
-        }
-      }
-    } catch (notificationError: any) {
-      // Не блокируем выполнение если уведомление не отправилось
-      console.error(`❌ Error sending notification for request ${request.id}:`, notificationError)
-    }
-
     // Финальная проверка что все обновлено
     const finalCheck = await prisma.request.findUnique({
       where: { id: request.id },
@@ -509,6 +493,57 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     
     const statusOk = finalCheck?.status === 'autodeposit_success'
     const paymentOk = finalPaymentCheck?.requestId === request.id && finalPaymentCheck?.isProcessed === true
+    
+    // Отправляем уведомление пользователю в бот, если заявка создана через бот
+    // ВАЖНО: Отправляем только если статус действительно обновился на autodeposit_success
+    // Это предотвращает дублирование уведомлений
+    if (statusOk && !updateResult?.skipped) {
+      try {
+        const fullRequest = await prisma.request.findUnique({
+          where: { id: request.id },
+          select: {
+            userId: true,
+            source: true,
+            amount: true,
+            bookmaker: true,
+          },
+        })
+        
+        if (fullRequest) {
+          const source = (fullRequest as any).source
+          const isFromBot = source === 'bot' || !source
+          
+          if (isFromBot && fullRequest.userId) {
+            const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
+              `💰 Сумма: ${fullRequest.amount} сом\n` +
+              `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
+              `⏱ Закрыта за: 1с`
+            
+            // Отправляем уведомление напрямую через Telegram API
+            const botToken = process.env.BOT_TOKEN
+            if (botToken) {
+              const sendMessageUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
+              fetch(sendMessageUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: fullRequest.userId.toString(),
+                  text: notificationMessage,
+                  parse_mode: 'HTML',
+                }),
+              }).then(() => {
+                console.log(`✅ [Auto-Deposit] Notification sent successfully for request ${request.id}`)
+              }).catch((error: any) => {
+                console.error(`❌ [Auto-Deposit] Failed to send notification for request ${request.id}:`, error)
+              })
+            }
+          }
+        }
+      } catch (notificationError: any) {
+        // Не блокируем выполнение если уведомление не отправилось
+        console.error(`❌ [Auto-Deposit] Error sending notification for request ${request.id}:`, notificationError)
+      }
+    }
     
     console.log(`📊 [Auto-Deposit] Final check for request ${request.id}:`, {
       status: finalCheck?.status,
