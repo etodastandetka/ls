@@ -12,6 +12,7 @@ import random
 import os
 import json
 import time
+from pathlib import Path
 from io import BytesIO
 from urllib.parse import quote
 try:
@@ -36,12 +37,34 @@ logger = logging.getLogger(__name__)
 # Отключаем спам от httpx (только WARNING и ERROR)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+def _load_env_file(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except Exception:
+        return
+
+
+# Загружаем .env из admin/.env или admin_nextjs/.env
+_root_dir = Path(__file__).resolve().parents[1]
+_load_env_file(_root_dir / "admin" / ".env")
+_load_env_file(_root_dir / "admin_nextjs" / ".env")
+
 # Токен бота
-BOT_TOKEN = "7522393363:AAEp5KrdTb0feBFJ-yqAs32K2BYZLfJ_BNY"
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 # URL сайта
-WEBSITE_URL = "https://lux-on.org"
-API_URL = "https://pipiska.net"
+WEBSITE_URL = os.getenv("MINI_APP_URL", "https://lux-on.org")
+API_URL = os.getenv("ADMIN_PUBLIC_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://pipiska.net"))
 
 # Словарь для хранения состояний пользователей
 user_states = {}
@@ -2965,15 +2988,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     """Главная функция"""
-    # Проверяем, что используется правильный токен
-    expected_token_start = "7522393363"  # Начало токена основного бота
-    if not BOT_TOKEN.startswith(expected_token_start):
-        logger.error(f"❌ ОШИБКА: Используется неправильный токен! Ожидается токен начинающийся с {expected_token_start}, получен: {BOT_TOKEN[:10]}...")
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Неправильный токен бота!")
-        raise ValueError(f"Неправильный токен бота. Ожидается токен начинающийся с {expected_token_start}")
-    
-    logger.info(f"✅ Используется правильный токен основного бота: {BOT_TOKEN[:10]}...")
-    print(f"✅ Токен бота проверен: {BOT_TOKEN[:10]}...")
+    if not BOT_TOKEN or ":" not in BOT_TOKEN:
+        raise ValueError("BOT_TOKEN не задан или имеет неверный формат")
     
     # Создаем приложение с post_init для загрузки настроек
     async def post_init(app: Application) -> None:

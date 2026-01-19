@@ -6,6 +6,7 @@ Telegram бот для техподдержки LUXON
 
 import logging
 import os
+from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
@@ -16,8 +17,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def _load_env_file(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except Exception:
+        return
+
+
+# Загружаем .env из admin/.env или admin_nextjs/.env
+_root_dir = Path(__file__).resolve().parents[1]
+_load_env_file(_root_dir / "admin" / ".env")
+_load_env_file(_root_dir / "admin_nextjs" / ".env")
+
 # Токен бота техподдержки
-SUPPORT_BOT_TOKEN = os.getenv('SUPPORT_BOT_TOKEN', '8390085986:AAH9iS53RgIleXC-JfExWv8SxwvJR1rPdbI')
+SUPPORT_BOT_TOKEN = os.getenv('SUPPORT_BOT_TOKEN', '')
 
 # ID операторов для уведомлений
 OPERATOR_IDS = [7638996648, 6826609528, 8203434235]
@@ -742,6 +765,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main() -> None:
     """Главная функция"""
+    if not SUPPORT_BOT_TOKEN or ":" not in SUPPORT_BOT_TOKEN:
+        raise ValueError("SUPPORT_BOT_TOKEN не задан или имеет неверный формат")
     # Создаем приложение
     application = Application.builder().token(SUPPORT_BOT_TOKEN).build()
     

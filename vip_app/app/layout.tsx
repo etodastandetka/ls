@@ -53,6 +53,12 @@ function BlockedChecker({ children }: { children: React.ReactNode }) {
           // В случае ошибки продолжаем работу
         }
       }
+
+      // Первая проверка сразу
+      checkUserStatus()
+
+      // Периодическая проверка (чтобы блокировка с админки применялась без перезагрузки)
+      const intervalId = setInterval(checkUserStatus, 30000)
       
       // Регистрируем реферала, если есть реферальный код в start_param
       const registerReferral = async () => {
@@ -169,6 +175,11 @@ function BlockedChecker({ children }: { children: React.ReactNode }) {
       
       checkUserStatus()
       registerReferral()
+
+      return () => {
+        isMountedRef.current = false
+        clearInterval(intervalId)
+      }
     }
     
     return () => {
