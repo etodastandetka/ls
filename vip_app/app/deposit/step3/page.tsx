@@ -159,32 +159,32 @@ function QRCodeWithText({ url }: { url: string }) {
 
   if (!qrImageUrl) {
     return (
-      <section className="card space-y-3">
-        <div className="label text-center">QR-код для оплаты</div>
+      <section className="card space-y-2">
+        <div className="label text-center text-xs">QR-код для оплаты</div>
         <div className="flex justify-center">
-          <div className="w-64 h-64 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
+          <div className="w-56 h-56 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
         </div>
       </section>
     )
   }
 
   return (
-    <section className="card space-y-3">
-      <div className="label text-center">QR-код для оплаты</div>
+    <section className="card space-y-2">
+      <div className="label text-center text-xs">QR-код для оплаты</div>
       <div className="flex justify-center">
         <div className="relative">
           {qrImageUrl ? (
             <img 
               src={qrImageUrl} 
               alt="QR код для оплаты" 
-              className="w-full max-w-[900px] h-auto rounded-lg border border-white/20"
+              className="w-full max-w-[520px] h-auto rounded-lg border border-white/20"
               onError={(e) => {
                 console.error('Error loading QR image')
                 e.currentTarget.style.display = 'none'
               }}
             />
           ) : (
-            <div className="w-full max-w-[900px] h-[600px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
+            <div className="w-full max-w-[520px] h-[360px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
               <div className="text-white/50">Загрузка QR-кода...</div>
             </div>
           )}
@@ -1087,22 +1087,22 @@ function DepositStep3Content() {
   }
 
   return (
-    <main className="space-y-4">
+    <main className="space-y-3">
       <FixedHeaderControls />
       
       {/* Заголовок и подзаголовок */}
       <div className="space-y-1">
-        <h1 className="text-xl font-bold text-white">{t.title}</h1>
-        <p className="text-white/80 text-sm">{t.subtitle}</p>
+        <h1 className="text-lg font-bold text-white">{t.title}</h1>
+        <p className="text-white/70 text-xs">{t.subtitle}</p>
       </div>
 
       {/* Таймер */}
-      <section className="card space-y-3 p-6">
+      <section className="card space-y-2 p-4">
         <div className="text-center">
           <div className="relative inline-block">
             {/* Круглый прогресс-бар */}
-            <div className="relative w-32 h-32 mx-auto mb-4">
-              <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 120 120">
+            <div className="relative w-24 h-24 mx-auto mb-2">
+              <svg className="transform -rotate-90 w-24 h-24" viewBox="0 0 120 120">
                 {/* Фоновый круг */}
                 <circle
                   cx="60"
@@ -1135,7 +1135,7 @@ function DepositStep3Content() {
               {/* Текст таймера в центре */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className={`text-3xl font-bold text-white transition-all duration-300 ${
+                  <div className={`text-2xl font-bold text-white transition-all duration-300 ${
                     timeLeft <= 60 ? 'text-red-400 animate-pulse' : ''
                   }`}>
                     {formatTime(timeLeft)}
@@ -1144,29 +1144,29 @@ function DepositStep3Content() {
               </div>
             </div>
           </div>
-          <div className="text-white/70 text-sm font-medium">{t.timeToPay}</div>
+          <div className="text-white/60 text-xs font-medium">{t.timeToPay}</div>
         </div>
       </section>
 
       {/* Детали заявки */}
-      <section className="card space-y-3">
-        <div className="label font-semibold">{t.requestDetails}</div>
+      <section className="card space-y-2">
+        <div className="label text-xs font-semibold">{t.requestDetails}</div>
         {bookmaker && (
           <div className="flex justify-between items-center">
-            <span className="text-white/80">{t.bookmaker}</span>
-            <span className="text-white font-semibold">{getBookmakerName(bookmaker)}</span>
+            <span className="text-white/70 text-sm">{t.bookmaker}</span>
+            <span className="text-white font-semibold text-sm">{getBookmakerName(bookmaker)}</span>
           </div>
         )}
         {accountId && (
           <div className="flex justify-between items-center">
-            <span className="text-white/80">{t.playerId}</span>
-            <span className="text-white font-semibold">{accountId}</span>
+            <span className="text-white/70 text-sm">{t.playerId}</span>
+            <span className="text-white font-semibold text-sm">{accountId}</span>
           </div>
         )}
         {amount && (
           <div className="flex justify-between items-center">
-            <span className="text-white/80">{t.amountToPay}</span>
-            <span className="text-white font-semibold text-lg">
+            <span className="text-white/70 text-sm">{t.amountToPay}</span>
+            <span className="text-white font-semibold text-base">
               {parseFloat(amount || '0').toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} сом
             </span>
           </div>
@@ -1184,8 +1184,8 @@ function DepositStep3Content() {
       })()}
 
       {/* Выбор банка */}
-      <section className="card space-y-3">
-        <div className="label">{t.selectBank}</div>
+      <section className="card space-y-2">
+        <div className="label text-xs">{t.selectBank}</div>
         {Object.keys(paymentUrls).length > 0 ? (
           <BankButtons
             onPick={handleBankSelect}
@@ -1195,21 +1195,21 @@ function DepositStep3Content() {
             enabledBanks={enabledBanks}
           />
         ) : (
-          <div className="text-center text-white/70 text-sm py-4">
+          <div className="text-center text-white/70 text-xs py-3">
             Загрузка ссылок для оплаты...
           </div>
         )}
         {loading && (
-          <div className="text-center text-white/70 text-sm py-2">
+          <div className="text-center text-white/70 text-xs py-2">
             {t.loading}
           </div>
         )}
       </section>
 
       {/* Загрузка чека */}
-      <section className="card space-y-3">
-          <div className="label">{t.uploadReceipt}</div>
-          <div className="text-white/70 text-xs mb-2">{t.uploadReceiptDesc}</div>
+      <section className="card space-y-2">
+          <div className="label text-xs">{t.uploadReceipt}</div>
+          <div className="text-white/60 text-xs">{t.uploadReceiptDesc}</div>
           
           <div className="relative">
             <input 
@@ -1222,19 +1222,19 @@ function DepositStep3Content() {
             />
             <label 
               htmlFor="receipt-upload"
-              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-sky-400/30 rounded-xl bg-gradient-to-br from-slate-900/20 to-slate-800/30 hover:border-sky-400/50 hover:bg-slate-800/40 transition-all duration-300 cursor-pointer group relative"
+              className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-sky-400/30 rounded-xl bg-gradient-to-br from-slate-900/20 to-slate-800/30 hover:border-sky-400/50 hover:bg-slate-800/40 transition-all duration-300 cursor-pointer group relative"
             >
               <div className="flex flex-col items-center space-y-2">
-                <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center group-hover:bg-sky-500/30 transition-colors">
-                  <svg className="w-4 h-4 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-7 h-7 rounded-full bg-sky-500/20 flex items-center justify-center group-hover:bg-sky-500/30 transition-colors">
+                  <svg className="w-3.5 h-3.5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-white group-hover:text-sky-300 transition-colors">
+                  <p className="text-xs font-medium text-white group-hover:text-sky-300 transition-colors">
                     {receiptFile ? 'Файл выбран' : (uploadingReceipt ? t.uploading : t.uploadReceipt)}
                   </p>
-                  <p className="text-xs text-white/60 mt-1">
+                  <p className="text-[11px] text-white/60 mt-1">
                     {receiptFile ? receiptFile.name : t.receiptFileTypes}
                   </p>
                 </div>
@@ -1244,15 +1244,15 @@ function DepositStep3Content() {
           
           {/* Предварительный просмотр - как в админ-панели */}
           {receiptPreview && (
-            <div className="mt-4 p-4 bg-black/20 rounded-xl border border-sky-400/20">
-              <div className="text-center mb-3">
-                <span className="text-sm text-sky-300 font-medium">Предварительный просмотр:</span>
+            <div className="mt-3 p-3 bg-black/20 rounded-xl border border-sky-400/20">
+              <div className="text-center mb-2">
+                <span className="text-xs text-sky-300 font-medium">Предварительный просмотр:</span>
               </div>
-              <div className="flex justify-center bg-gray-900 rounded-lg overflow-hidden" style={{ minHeight: '200px' }}>
+              <div className="flex justify-center bg-gray-900 rounded-lg overflow-hidden" style={{ minHeight: '160px' }}>
                 <img 
                   src={receiptPreview} 
                   alt="Receipt Preview" 
-                  className="w-full h-auto max-h-96 rounded-lg object-contain"
+                  className="w-full h-auto max-h-72 rounded-lg object-contain"
                   style={{ display: 'block' }}
                   onError={(e) => {
                     console.error('❌ Ошибка загрузки изображения чека')
