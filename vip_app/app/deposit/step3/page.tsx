@@ -11,7 +11,7 @@ import { compressImage, fileToBase64 } from '../../../utils/imageCompression'
 import { useRequireAuth } from '../../../hooks/useRequireAuth'
 
 // Компонент QR-кода с текстом (как в боте)
-function QRCodeWithText({ url }: { url: string }) {
+function QRCodeWithText({ url, embedded = false }: { url: string; embedded?: boolean }) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -157,41 +157,36 @@ function QRCodeWithText({ url }: { url: string }) {
     generateQRCode()
   }, [url])
 
-  if (!qrImageUrl) {
-    return (
-      <section className="card space-y-2">
-        <div className="label text-center text-xs">QR-код для оплаты</div>
-        <div className="flex justify-center">
-          <div className="w-40 h-40 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
-        </div>
-      </section>
-    )
-  }
-
-  return (
-      <section className="card space-y-2">
-      <div className="label text-center text-xs">QR-код для оплаты</div>
+  const content = (
+    <>
+      {!embedded && <div className="label text-center text-xs">QR-код для оплаты</div>}
       <div className="flex justify-center">
         <div className="relative">
           {qrImageUrl ? (
-              <img 
+            <img 
               src={qrImageUrl} 
               alt="QR код для оплаты" 
-                className="w-full max-w-[280px] h-auto rounded-lg border border-white/20"
+              className="w-full max-w-[240px] h-auto rounded-lg border border-white/20"
               onError={(e) => {
                 console.error('Error loading QR image')
                 e.currentTarget.style.display = 'none'
               }}
             />
           ) : (
-              <div className="w-full max-w-[280px] h-[200px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
+            <div className="w-full max-w-[240px] h-[180px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
               <div className="text-white/50">Загрузка QR-кода...</div>
             </div>
           )}
         </div>
       </div>
-    </section>
+    </>
   )
+
+  if (embedded) {
+    return content
+  }
+
+  return <section className="card space-y-2">{content}</section>
 }
 
 declare global {
@@ -1152,43 +1147,20 @@ function DepositStep3Content() {
         </div>
       </section>
 
-      {/* Детали заявки */}
-      <section className="card space-y-2">
-        <div className="label text-xs font-semibold">{t.requestDetails}</div>
-        {bookmaker && (
-          <div className="flex justify-between items-center">
-            <span className="text-white/70 text-sm">{t.bookmaker}</span>
-            <span className="text-white font-semibold text-sm">{getBookmakerName(bookmaker)}</span>
+      {/* QR-код и выбор банка */}
+      <section className="card space-y-3">
+        <div className="label text-center text-xs">QR-код для оплаты</div>
+        {Object.keys(paymentUrls).length > 0 && (() => {
+          // Используем ссылку O!Money для QR-кода, если есть, иначе первую доступную
+          const omoneyUrl = paymentUrls['O!Money'] || paymentUrls['omoney'] || Object.values(paymentUrls)[0]
+          return omoneyUrl ? <QRCodeWithText url={omoneyUrl} embedded /> : null
+        })()}
+        {Object.keys(paymentUrls).length === 0 && (
+          <div className="flex justify-center">
+            <div className="w-40 h-40 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
           </div>
         )}
-        {accountId && (
-          <div className="flex justify-between items-center">
-            <span className="text-white/70 text-sm">{t.playerId}</span>
-            <span className="text-white font-semibold text-sm">{accountId}</span>
-          </div>
-        )}
-        {amount && (
-          <div className="flex justify-between items-center">
-            <span className="text-white/70 text-sm">{t.amountToPay}</span>
-            <span className="text-white font-semibold text-base">
-              {parseFloat(amount || '0').toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} сом
-            </span>
-          </div>
-        )}
-      </section>
-
-      {/* QR-код для оплаты */}
-      {Object.keys(paymentUrls).length > 0 && (() => {
-        // Используем ссылку O!Money для QR-кода, если есть, иначе первую доступную
-        const omoneyUrl = paymentUrls['O!Money'] || paymentUrls['omoney'] || Object.values(paymentUrls)[0]
-        
-        return omoneyUrl ? (
-          <QRCodeWithText url={omoneyUrl} />
-        ) : null
-      })()}
-
-      {/* Выбор банка */}
-      <section className="card space-y-2">
+        <div className="h-px bg-white/10" />
         <div className="label text-xs">{t.selectBank}</div>
         {Object.keys(paymentUrls).length > 0 ? (
           <BankButtons
@@ -1271,6 +1243,31 @@ function DepositStep3Content() {
             </div>
           )}
         </section>
+
+      {/* Детали заявки */}
+      <section className="card space-y-2">
+        <div className="label text-xs font-semibold">{t.requestDetails}</div>
+        {bookmaker && (
+          <div className="flex justify-between items-center">
+            <span className="text-white/70 text-sm">{t.bookmaker}</span>
+            <span className="text-white font-semibold text-sm">{getBookmakerName(bookmaker)}</span>
+          </div>
+        )}
+        {accountId && (
+          <div className="flex justify-between items-center">
+            <span className="text-white/70 text-sm">{t.playerId}</span>
+            <span className="text-white font-semibold text-sm">{accountId}</span>
+          </div>
+        )}
+        {amount && (
+          <div className="flex justify-between items-center">
+            <span className="text-white/70 text-sm">{t.amountToPay}</span>
+            <span className="text-white font-semibold text-base">
+              {parseFloat(amount || '0').toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} сом
+            </span>
+          </div>
+        )}
+      </section>
 
       <div className="flex gap-3">
         <button 
