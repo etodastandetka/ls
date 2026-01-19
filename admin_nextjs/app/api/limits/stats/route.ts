@@ -6,6 +6,10 @@ import '@/lib/shift-scheduler'
 
 export const dynamic = 'force-dynamic'
 
+// Константы для расчета прибыли (должны совпадать с формулой в close-daily-shift.ts)
+const PROFIT_DEPOSIT_PERCENT = 0.08 // 8% от пополнений
+const PROFIT_WITHDRAWAL_PERCENT = 0.02 // 2% от выводов
+
 interface PlatformStats {
   key: string
   name: string
@@ -33,6 +37,8 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('end')
 
     // Статусы для подсчета (учитываем все успешные статусы, включая ручную обработку)
+    // ВАЖНО: Эти статусы должны совпадать с теми, что используются при закрытии смены
+    // Используем все успешные статусы для точного подсчета
     const depositSuccessStatuses = ['autodeposit_success', 'auto_completed', 'completed', 'approved']
     const withdrawalSuccessStatuses = ['completed', 'approved', 'autodeposit_success', 'auto_completed']
 
@@ -86,47 +92,156 @@ export async function GET(request: NextRequest) {
         approximateIncome += parseFloat(shift.netProfit.toString())
       })
 
-      // Также учитываем текущую смену, если она попадает в период И еще не закрыта
+      // Также учитываем незакрытые смены за период (если есть дни, которые еще не закрыты)
+      // Получаем список всех закрытых смен за период
+      const closedShiftDates = new Set(
+        shifts.map((shift) => shift.shiftDate.toISOString().split('T')[0])
+      )
+
+      // Получаем все смены за период (включая незакрытые) для определения, какие дни нужно считать из requests
+      let allShiftsInPeriod: any[] = []
+      try {
+        // @ts-ignore - dailyShift может быть не в типах, если Prisma Client не обновлен
+        allShiftsInPeriod = await prisma.dailyShift.findMany({
+          where: {
+            shiftDate: {
+              gte: start,
+              lte: end,
+            },
+          },
+        })
+      } catch (dbError: any) {
+        // Игнорируем ошибки таблицы
+        if (!(dbError.message?.includes('does not exist') || 
+              dbError.message?.includes('Unknown model') ||
+              dbError.code === 'P2021')) {
+          throw dbError
+        }
+      }
+
+      // Определяем, какие дни нужно считать из requests (не закрытые смены)
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      const todayEnd = new Date(today)
-      todayEnd.setHours(23, 59, 59, 999)
+      const now = new Date()
 
-      if (today >= start && today <= end) {
-        // Проверяем, закрыта ли уже смена за сегодня
-        let todayShift: any = null
-        try {
-          // @ts-ignore - dailyShift может быть не в типах, если Prisma Client не обновлен
-          todayShift = await prisma.dailyShift.findUnique({
+      // Создаем Set всех дат, для которых есть закрытые смены
+      const allShiftDates = new Set(
+        allShiftsInPeriod
+          .filter((s) => s.isClosed)
+          .map((s) => s.shiftDate.toISOString().split('T')[0])
+      )
+
+      // Для незакрытых дней считаем напрямую из requests одним запросом
+      // Но нужно быть осторожным: если период большой, лучше считать по дням
+      // Для оптимизации: считаем все незакрытые дни одним запросом, но только если период не слишком большой
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      
+      if (daysDiff <= 31) {
+        // Период небольшой - можем считать все незакрытые дни одним запросом
+        // Но нужно исключить закрытые дни из подсчета
+        // Для этого используем более сложную логику: считаем все requests за период,
+        // но исключаем те, которые уже учтены в закрытых сменах
+        
+        // ВАЖНО: Это упрощение - мы считаем все requests за период, включая закрытые дни
+        // Но потом вычитаем суммы закрытых смен, чтобы не было дублирования
+        // Это работает только если закрытые смены считают те же статусы, что и мы
+        
+        // Сначала получаем общую статистику за весь период
+        const [periodDepositStats, periodWithdrawalStats] = await Promise.all([
+          prisma.request.aggregate({
             where: {
-              shiftDate: today,
+              requestType: 'deposit',
+              status: { in: depositSuccessStatuses },
+              createdAt: {
+                gte: start,
+                lte: end,
+              },
             },
-          })
-        } catch (dbError: any) {
-          // Если таблица не существует, просто продолжаем
-          if (!(dbError.message?.includes('does not exist') || 
-                dbError.message?.includes('Unknown model') ||
-                dbError.code === 'P2021')) {
-            throw dbError
+            _count: { id: true },
+            _sum: { amount: true },
+          }),
+          prisma.request.aggregate({
+            where: {
+              requestType: 'withdraw',
+              status: { in: withdrawalSuccessStatuses },
+              createdAt: {
+                gte: start,
+                lte: end,
+              },
+            },
+            _count: { id: true },
+            _sum: { amount: true },
+          }),
+        ])
+
+        const periodDepositsSum = parseFloat(periodDepositStats._sum.amount?.toString() || '0')
+        const periodDepositsCount = periodDepositStats._count.id || 0
+        const periodWithdrawalsSum = parseFloat(periodWithdrawalStats._sum.amount?.toString() || '0')
+        const periodWithdrawalsCount = periodWithdrawalStats._count.id || 0
+
+        // Вычисляем суммы из закрытых смен (уже учтены выше)
+        let closedDepositsSum = 0
+        let closedDepositsCount = 0
+        let closedWithdrawalsSum = 0
+        let closedWithdrawalsCount = 0
+
+        shifts.forEach((shift) => {
+          closedDepositsSum += parseFloat(shift.depositsSum.toString())
+          closedDepositsCount += shift.depositsCount
+          closedWithdrawalsSum += parseFloat(shift.withdrawalsSum.toString())
+          closedWithdrawalsCount += shift.withdrawalsCount
+        })
+
+        // Добавляем разницу (незакрытые дни) к уже посчитанным закрытым сменам
+        const unclosedDepositsSum = periodDepositsSum - closedDepositsSum
+        const unclosedDepositsCount = periodDepositsCount - closedDepositsCount
+        const unclosedWithdrawalsSum = periodWithdrawalsSum - closedWithdrawalsSum
+        const unclosedWithdrawalsCount = periodWithdrawalsCount - closedWithdrawalsCount
+
+        // Добавляем незакрытые дни к уже посчитанным закрытым сменам
+        totalDepositsSum += unclosedDepositsSum
+        totalDepositsCount += unclosedDepositsCount
+        totalWithdrawalsSum += unclosedWithdrawalsSum
+        totalWithdrawalsCount += unclosedWithdrawalsCount
+        
+        // Добавляем прибыль от незакрытых дней
+        approximateIncome += unclosedDepositsSum * PROFIT_DEPOSIT_PERCENT + unclosedWithdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
+      } else {
+        // Период большой - считаем только незакрытые дни (оптимизация)
+        // Для каждого незакрытого дня делаем отдельный запрос
+        const datesInPeriod: Date[] = []
+        const currentDate = new Date(start)
+        while (currentDate <= end) {
+          const dateStr = currentDate.toISOString().split('T')[0]
+          if (!allShiftDates.has(dateStr)) {
+            datesInPeriod.push(new Date(currentDate))
           }
+          currentDate.setDate(currentDate.getDate() + 1)
         }
 
-        // Добавляем данные за сегодня только если смена еще НЕ закрыта
-        // Если смена закрыта, данные уже учтены в shifts выше
-        if (!todayShift || !todayShift.isClosed) {
-          const todayFilter = {
+        // Считаем незакрытые дни
+        for (const date of datesInPeriod) {
+          const dayStart = new Date(date)
+          dayStart.setHours(0, 0, 0, 0)
+          const dayEnd = new Date(date)
+          dayEnd.setHours(23, 59, 59, 999)
+          
+          // Если это сегодня - считаем до текущего момента, иначе до конца дня
+          const filterEnd = date.toDateString() === today.toDateString() ? now : dayEnd
+
+          const dayFilter = {
             createdAt: {
-              gte: today,
-              lte: new Date(), // До текущего момента
+              gte: dayStart,
+              lte: filterEnd,
             },
           }
 
-          const [todayDepositStats, todayWithdrawalStats] = await Promise.all([
+          const [dayDepositStats, dayWithdrawalStats] = await Promise.all([
             prisma.request.aggregate({
               where: {
                 requestType: 'deposit',
                 status: { in: depositSuccessStatuses },
-                ...todayFilter,
+                ...dayFilter,
               },
               _count: { id: true },
               _sum: { amount: true },
@@ -135,19 +250,19 @@ export async function GET(request: NextRequest) {
               where: {
                 requestType: 'withdraw',
                 status: { in: withdrawalSuccessStatuses },
-                ...todayFilter,
+                ...dayFilter,
               },
               _count: { id: true },
               _sum: { amount: true },
             }),
           ])
 
-          totalDepositsSum += parseFloat(todayDepositStats._sum.amount?.toString() || '0')
-          totalDepositsCount += todayDepositStats._count.id || 0
-          totalWithdrawalsSum += parseFloat(todayWithdrawalStats._sum.amount?.toString() || '0')
-          totalWithdrawalsCount += todayWithdrawalStats._count.id || 0
-          approximateIncome += parseFloat(todayDepositStats._sum.amount?.toString() || '0') * 0.08 + 
-                              parseFloat(todayWithdrawalStats._sum.amount?.toString() || '0') * 0.02
+          totalDepositsSum += parseFloat(dayDepositStats._sum.amount?.toString() || '0')
+          totalDepositsCount += dayDepositStats._count.id || 0
+          totalWithdrawalsSum += parseFloat(dayWithdrawalStats._sum.amount?.toString() || '0')
+          totalWithdrawalsCount += dayWithdrawalStats._count.id || 0
+          approximateIncome += parseFloat(dayDepositStats._sum.amount?.toString() || '0') * PROFIT_DEPOSIT_PERCENT + 
+                              parseFloat(dayWithdrawalStats._sum.amount?.toString() || '0') * PROFIT_WITHDRAWAL_PERCENT
         }
       }
     } else {
@@ -219,7 +334,7 @@ export async function GET(request: NextRequest) {
         totalDepositsSum = parseFloat(depositStats._sum.amount?.toString() || '0')
         totalWithdrawalsCount = withdrawalStats._count.id || 0
         totalWithdrawalsSum = parseFloat(withdrawalStats._sum.amount?.toString() || '0')
-        approximateIncome = totalDepositsSum * 0.08 + totalWithdrawalsSum * 0.02
+        approximateIncome = totalDepositsSum * PROFIT_DEPOSIT_PERCENT + totalWithdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
       }
     }
 

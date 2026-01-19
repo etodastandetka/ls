@@ -26,8 +26,9 @@ async function closeDailyShift() {
 
     console.log(`🔄 Закрытие смены за ${shiftDate.toISOString().split('T')[0]}`)
 
-    // Статусы для подсчета
-    const depositSuccessStatuses = ['autodeposit_success', 'auto_completed']
+    // Статусы для подсчета (ВАЖНО: должны совпадать с /api/limits/stats)
+    // Учитываем все успешные статусы, включая ручную обработку (completed, approved)
+    const depositSuccessStatuses = ['autodeposit_success', 'auto_completed', 'completed', 'approved']
     const withdrawalSuccessStatuses = ['completed', 'approved', 'autodeposit_success', 'auto_completed']
 
     // Получаем статистику за день
@@ -64,7 +65,10 @@ async function closeDailyShift() {
     const withdrawalsCount = withdrawalStats._count.id || 0
 
     // Чистая прибыль: 8% от пополнений + 2% от выводов
-    const netProfit = depositsSum * 0.08 + withdrawalsSum * 0.02
+    // ВАЖНО: Эти проценты должны совпадать с константами в /api/limits/stats
+    const PROFIT_DEPOSIT_PERCENT = 0.08 // 8% от пополнений
+    const PROFIT_WITHDRAWAL_PERCENT = 0.02 // 2% от выводов
+    const netProfit = depositsSum * PROFIT_DEPOSIT_PERCENT + withdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
 
     // Создаем или обновляем смену
     const shift = await prisma.dailyShift.upsert({
@@ -122,6 +126,11 @@ if (require.main === module) {
 }
 
 export default closeDailyShift
+
+
+
+
+
 
 
 

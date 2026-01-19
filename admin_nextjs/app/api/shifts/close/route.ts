@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
     const shiftEnd = new Date(shiftDate)
     shiftEnd.setHours(23, 59, 59, 999)
 
-    // Статусы для подсчета
-    const depositSuccessStatuses = ['autodeposit_success', 'auto_completed']
+    // Статусы для подсчета (ВАЖНО: должны совпадать с /api/limits/stats)
+    // Учитываем все успешные статусы, включая ручную обработку (completed, approved)
+    const depositSuccessStatuses = ['autodeposit_success', 'auto_completed', 'completed', 'approved']
     const withdrawalSuccessStatuses = ['completed', 'approved', 'autodeposit_success', 'auto_completed']
 
     // Получаем статистику за день
@@ -68,7 +69,10 @@ export async function POST(request: NextRequest) {
     const withdrawalsCount = withdrawalStats._count.id || 0
 
     // Чистая прибыль: 8% от пополнений + 2% от выводов
-    const netProfit = depositsSum * 0.08 + withdrawalsSum * 0.02
+    // ВАЖНО: Эти проценты должны совпадать с константами в /api/limits/stats
+    const PROFIT_DEPOSIT_PERCENT = 0.08 // 8% от пополнений
+    const PROFIT_WITHDRAWAL_PERCENT = 0.02 // 2% от выводов
+    const netProfit = depositsSum * PROFIT_DEPOSIT_PERCENT + withdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
 
     // Создаем или обновляем смену
     const shift = await prisma.dailyShift.upsert({
@@ -119,6 +123,11 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+
+
+
+
 
 
 
