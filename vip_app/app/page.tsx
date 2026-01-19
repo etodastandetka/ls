@@ -154,6 +154,7 @@ export default function HomePage() {
   
   const [isTelegramWebApp, setIsTelegramWebApp] = useState(initialState.isTelegramWebApp)
   const [user, setUser] = useState<TelegramUser | null>(initialState.user)
+  const [authReady, setAuthReady] = useState(false)
   
   const userInitialized = useRef(false)
   
@@ -165,6 +166,7 @@ export default function HomePage() {
     const isWebApp = !!tg && !!tg.initDataUnsafe?.user // Проверяем не только наличие объекта, но и реальные данные пользователя
     
     setIsTelegramWebApp(isWebApp)
+    setAuthReady(true)
   }, [])
   
   // Функция для обновления пользователя (для синхронизации с другими вкладками и периодических проверок)
@@ -482,7 +484,7 @@ export default function HomePage() {
 
       <div className="wb-wrap space-y-6">
         {/* Показываем виджет входа только если НЕ в Telegram Mini App (для обычного сайта) и пользователь не авторизован */}
-        {!user && !isTelegramWebApp && (
+        {authReady && !user && !isTelegramWebApp && (
           <section className="wb-section" style={{ textAlign: 'center', padding: '1rem' }}>
             <div style={{
               background: 'linear-gradient(135deg, rgba(79, 169, 255, 0.14), rgba(47, 129, 230, 0.12))',

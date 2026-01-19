@@ -316,23 +316,29 @@ export default function ProfilePage() {
       )}
 
       {/* Кнопки */}
-      <div className="text-center space-y-3">
+      <div className="flex gap-3">
         <button
           onClick={() => router.push('/')}
-          className="btn btn-ghost flex items-center justify-center gap-2"
+          className="btn btn-ghost flex-1 flex items-center justify-center gap-2"
         >
           <BackIcon className="w-5 h-5" />
           {t.back}
         </button>
         <button
           onClick={() => {
+            const botUrl = 'https://t.me/operator_luxon_bot'
             if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-              window.Telegram.WebApp.close()
+              // Закрываем мини-приложение, либо открываем Telegram ссылку
+              try {
+                window.Telegram.WebApp.close()
+              } catch {
+                window.Telegram.WebApp.openTelegramLink(botUrl)
+              }
             } else {
-              window.close()
+              window.location.href = botUrl
             }
           }}
-          className="btn btn-primary flex items-center justify-center gap-2"
+          className="btn btn-primary flex-1 flex items-center justify-center gap-2"
         >
           {t.exitTelegram}
         </button>
