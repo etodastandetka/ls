@@ -580,9 +580,6 @@ export default function HomePage() {
                 </div>
                 <div className="wb-row-text">
                   <div className="wb-row-title">{t.referral}</div>
-                  <div className="wb-row-sub">
-                    {language === "en" ? "Invite friends, earn rewards" : "Приглашай друзей и получай бонусы"}
-                  </div>
                 </div>
               </div>
               <div className="wb-row-right">
@@ -597,7 +594,6 @@ export default function HomePage() {
                 </div>
                 <div className="wb-row-text">
                   <div className="wb-row-title">{t.history}</div>
-                  <div className="wb-row-sub">{language === "en" ? "All operations in one place" : "Все операции в одном месте"}</div>
                 </div>
               </div>
               <div className="wb-row-right">
@@ -612,7 +608,6 @@ export default function HomePage() {
                 </div>
                 <div className="wb-row-text">
                   <div className="wb-row-title">{t.instruction}</div>
-                  <div className="wb-row-sub">{language === "en" ? "Step-by-step guide" : "Пошаговая инструкция"}</div>
                 </div>
               </div>
               <div className="wb-row-right">
@@ -627,7 +622,6 @@ export default function HomePage() {
                 </div>
                 <div className="wb-row-text">
                   <div className="wb-row-title">{t.support}</div>
-                  <div className="wb-row-sub">{language === "en" ? "Support is here 24/7" : "Поддержка 24/7"}</div>
                 </div>
               </div>
               <div className="wb-row-right">
