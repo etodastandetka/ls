@@ -113,7 +113,8 @@ export default function ProfilePage() {
       totalWithdrawn: 'Всего выведено',
       recentTransactions: 'Последние операции',
       viewAll: 'Посмотреть все',
-      back: 'Назад'
+      back: 'Назад',
+      exitTelegram: 'Выйти в Telegram'
     },
     en: {
       title: 'Profile',
@@ -123,7 +124,8 @@ export default function ProfilePage() {
       totalWithdrawn: 'Total Withdrawn',
       recentTransactions: 'Recent Transactions',
       viewAll: 'View All',
-      back: 'Back'
+      back: 'Back',
+      exitTelegram: 'Exit to Telegram'
     }
   }
 
@@ -313,14 +315,26 @@ export default function ProfilePage() {
         </>
       )}
 
-      {/* Кнопка назад */}
-      <div className="text-center">
+      {/* Кнопки */}
+      <div className="text-center space-y-3">
         <button
           onClick={() => router.push('/')}
           className="btn btn-ghost flex items-center justify-center gap-2"
         >
           <BackIcon className="w-5 h-5" />
           {t.back}
+        </button>
+        <button
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+              window.Telegram.WebApp.close()
+            } else {
+              window.close()
+            }
+          }}
+          className="btn btn-primary flex items-center justify-center gap-2"
+        >
+          {t.exitTelegram}
         </button>
       </div>
     </main>
