@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react'
 import FixedHeaderControls from '../../../components/FixedHeaderControls'
 import { useRouter } from 'next/navigation'
-import BankButtons from '../../../components/BankButtons'
 import { useLanguage } from '../../../components/LanguageContext'
 import { getApiBase } from '../../../utils/fetch'
 import { compressImage, fileToBase64 } from '../../../utils/imageCompression'
@@ -159,12 +158,10 @@ export default function WithdrawStep2() {
   const router = useRouter()
   const { language } = useLanguage()
   const isAuthorized = useRequireAuth()
-  const [bank, setBank] = useState('')
-  const [enabledBanks, setEnabledBanks] = useState<string[]>([])
+  const [bank, setBank] = useState('omoney')
   const [phone, setPhone] = useState('+996')
   const [qrPhoto, setQrPhoto] = useState<File | null>(null)
   const [qrPhotoPreview, setQrPhotoPreview] = useState<string | null>(null)
-  const bankSectionRef = useRef<HTMLDivElement>(null)
   const phoneSectionRef = useRef<HTMLDivElement>(null)
   const qrSectionRef = useRef<HTMLDivElement>(null)
 
@@ -176,54 +173,10 @@ export default function WithdrawStep2() {
     }
   }, [router])
 
-  
   useEffect(() => {
-    async function loadBankSettings() {
-      try {
-        const base = getApiBase()
-        const { getTelegramUserId } = await import('../../../utils/telegram')
-        const telegramUserId = getTelegramUserId()
-        const url = telegramUserId 
-          ? `${base}/api/public/payment-settings?user_id=${telegramUserId}`
-          : `${base}/api/public/payment-settings`
-        const res = await fetch(url, { cache: 'no-store' })
-        const data = await res.json()
-        
-        if (data && data.withdrawals && data.withdrawals.banks && Array.isArray(data.withdrawals.banks)) {
-          const bankCodeMapping: Record<string, string> = {
-            'kompanion': 'kompanion',
-            'odengi': 'omoney',
-            'bakai': 'bakai',
-            'balance': 'balance',
-            'megapay': 'megapay',
-            'mbank': 'mbank',
-            'demir': 'demirbank',
-            'demirbank': 'demirbank'
-          }
-          const mappedBanks: string[] = []
-          for (const b of data.withdrawals.banks) {
-            const code = b.code || b
-            const mapped = bankCodeMapping[code] || code
-            if (mapped) mappedBanks.push(mapped)
-          }
-          setEnabledBanks(mappedBanks)
-        }
-      } catch (error) {
-        console.error('Error loading bank settings:', error)
-      }
-    }
-    loadBankSettings()
-  }, [])
-
-  
-  useEffect(() => {
-    const savedBank = localStorage.getItem('withdraw_bank')
     const savedPhone = localStorage.getItem('withdraw_phone')
     const savedQrPhoto = localStorage.getItem('withdraw_qr_photo')
-    
-    if (savedBank) {
-      setBank(savedBank)
-    }
+    localStorage.setItem('withdraw_bank', 'omoney')
     
     if (savedPhone) {
       setPhone(savedPhone.startsWith('+') ? savedPhone : `+${savedPhone}`)
@@ -233,22 +186,6 @@ export default function WithdrawStep2() {
       setQrPhotoPreview(savedQrPhoto)
     }
   }, [])
-
-  
-  useEffect(() => {
-    if (bank) {
-      setTimeout(() => {
-        if (phoneSectionRef.current) {
-          const elementPosition = phoneSectionRef.current.getBoundingClientRect().top
-          const offsetPosition = elementPosition + window.pageYOffset - 20
-          window.scrollTo({
-            top: offsetPosition,
-            behavior: 'smooth'
-          })
-        }
-      }, 200)
-    }
-  }, [bank])
 
   
   useEffect(() => {
@@ -391,11 +328,6 @@ export default function WithdrawStep2() {
   }
 
   const handleNext = () => {
-    if (!bank) {
-      alert('Выберите банк')
-      return
-    }
-    
     const cleanPhone = phone.replace(/[^\d]/g, '')
     if (!cleanPhone || cleanPhone.length < 12) {
       alert('Введите корректный номер телефона')
@@ -407,7 +339,7 @@ export default function WithdrawStep2() {
       return
     }
     
-    localStorage.setItem('withdraw_bank', bank)
+    localStorage.setItem('withdraw_bank', bank || 'omoney')
     localStorage.setItem('withdraw_phone', cleanPhone)
     router.push('/withdraw/step3')
   }
@@ -431,17 +363,6 @@ export default function WithdrawStep2() {
           </div>
         </div>
 
-        
-        <div ref={bankSectionRef}>
-          <label className="label">{t.selectBank}</label>
-          <BankButtons 
-            onPick={setBank} 
-            selected={bank} 
-            enabledBanks={enabledBanks.length > 0 ? enabledBanks : []}
-          />
-        </div>
-
-        
         <div ref={phoneSectionRef}>
           <label className="label">{t.phone}</label>
           <input 

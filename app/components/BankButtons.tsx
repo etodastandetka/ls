@@ -20,13 +20,14 @@ const DEPOSIT_BANKS: Bank[] = ALL_BANKS.filter(bank => bank.code !== 'kompanion'
 // Банки для выводов (все банки включая Компаньон)
 const WITHDRAWAL_BANKS: Bank[] = ALL_BANKS
 
-function BankButtons({ onPick, selected, disabled, paymentUrl, allBankUrls, enabledBanks }: { 
+function BankButtons({ onPick, selected, disabled, paymentUrl, allBankUrls, enabledBanks, compact = false }: { 
   onPick: (code: string) => void; 
   selected?: string; 
   disabled?: boolean;
   paymentUrl?: string;
   allBankUrls?: Record<string, string>;
   enabledBanks?: string[];
+  compact?: boolean;
 }) {
   // Определяем, это вывод (без ссылок) или депозит (со ссылками)
   // Если allBankUrls передан (даже если пустой объект), это депозит
@@ -178,12 +179,16 @@ function BankButtons({ onPick, selected, disabled, paymentUrl, allBankUrls, enab
   console.log('🏦 BankButtons - enabledBanks:', enabledBanks)
   console.log('🏦 BankButtons - filteredBanks:', filteredBanks.map(b => b.code))
 
+  const buttonSizeClass = compact ? 'text-xs py-2 px-2.5 h-12' : 'text-sm py-3 px-4 h-16'
+  const iconWrapClass = compact ? 'relative w-6 h-6' : 'relative w-8 h-8'
+  const emojiClass = compact ? 'mr-1 text-base' : 'mr-1 text-xl'
+
   return (
-    <div className="grid grid-cols-2 gap-1">
+    <div className={`grid grid-cols-2 ${compact ? 'gap-1.5' : 'gap-1'}`}>
       {filteredBanks.map(b => (
         <button 
           key={b.code} 
-          className={`btn transition-all duration-200 text-sm flex items-center justify-center gap-3 py-3 px-4 h-16 ${
+          className={`btn transition-all duration-200 flex items-center justify-center gap-3 ${buttonSizeClass} ${
             selected === b.code 
               ? 'btn-primary' 
               : 'btn-ghost'
@@ -192,7 +197,7 @@ function BankButtons({ onPick, selected, disabled, paymentUrl, allBankUrls, enab
           disabled={disabled}
         >
           {b.image ? (
-            <div className="relative w-8 h-8">
+            <div className={iconWrapClass}>
               <Image 
                 src={b.image} 
                 alt={b.name}
@@ -204,7 +209,7 @@ function BankButtons({ onPick, selected, disabled, paymentUrl, allBankUrls, enab
               />
             </div>
           ) : (
-            <span className="mr-1 text-xl">{b.emoji}</span>
+            <span className={emojiClass}>{b.emoji}</span>
           )}
           <span className="truncate">{b.name}</span>
         </button>

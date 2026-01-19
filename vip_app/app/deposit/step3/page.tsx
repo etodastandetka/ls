@@ -162,14 +162,14 @@ function QRCodeWithText({ url }: { url: string }) {
       <section className="card space-y-2">
         <div className="label text-center text-xs">QR-код для оплаты</div>
         <div className="flex justify-center">
-          <div className="w-56 h-56 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
+          <div className="w-48 h-48 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
         </div>
       </section>
     )
   }
 
   return (
-    <section className="card space-y-2">
+      <section className="card space-y-2">
       <div className="label text-center text-xs">QR-код для оплаты</div>
       <div className="flex justify-center">
         <div className="relative">
@@ -177,14 +177,14 @@ function QRCodeWithText({ url }: { url: string }) {
             <img 
               src={qrImageUrl} 
               alt="QR код для оплаты" 
-              className="w-full max-w-[520px] h-auto rounded-lg border border-white/20"
+                className="w-full max-w-[360px] h-auto rounded-lg border border-white/20"
               onError={(e) => {
                 console.error('Error loading QR image')
                 e.currentTarget.style.display = 'none'
               }}
             />
           ) : (
-            <div className="w-full max-w-[520px] h-[360px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
+              <div className="w-full max-w-[360px] h-[260px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
               <div className="text-white/50">Загрузка QR-кода...</div>
             </div>
           )}
@@ -1193,6 +1193,7 @@ function DepositStep3Content() {
             disabled={loading}
             allBankUrls={paymentUrls}
             enabledBanks={enabledBanks}
+            compact
           />
         ) : (
           <div className="text-center text-white/70 text-xs py-3">
