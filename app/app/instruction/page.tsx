@@ -1,4 +1,5 @@
 "use client"
+import { useEffect } from 'react'
 import { useLanguage } from '../../components/LanguageContext'
 import FixedHeaderControls from '../../components/FixedHeaderControls'
 import { InstructionIcon, DepositIcon, WithdrawIcon, SupportIcon, BackIcon } from '../../components/Icons'
@@ -7,6 +8,26 @@ import { useRouter } from 'next/navigation'
 export default function InstructionPage() {
   const { language } = useLanguage()
   const router = useRouter()
+
+  useEffect(() => {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-step-reveal="true"]'))
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries, obs) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            obs.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -10% 0px' }
+    )
+
+    elements.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
 
   const translations = {
     ru: {
@@ -244,7 +265,12 @@ export default function InstructionPage() {
         
         <div className="space-y-4">
           {t.depositSteps.map((step, index) => (
-            <div key={index} className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
+            <div
+              key={index}
+              data-step-reveal="true"
+              className="step-reveal flex items-start gap-4 p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+              style={{ transitionDelay: `${index * 80}ms` }}
+            >
               <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-lg">
                 {step.number}
               </div>
@@ -269,7 +295,12 @@ export default function InstructionPage() {
         
         <div className="space-y-4">
           {t.withdrawSteps.map((step, index) => (
-            <div key={index} className="flex gap-4 p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
+            <div
+              key={index}
+              data-step-reveal="true"
+              className="step-reveal flex items-start gap-4 p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+              style={{ transitionDelay: `${index * 80}ms` }}
+            >
               <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-lg">
                 {step.number}
               </div>

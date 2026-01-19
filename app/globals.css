@@ -310,6 +310,27 @@ body::before {
   animation: float 3s ease-in-out infinite;
 }
 
+/* Пошаговые карточки - появление при скролле */
+.step-reveal {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  will-change: opacity, transform;
+}
+
+.step-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-reveal {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
 /* Задержки для последовательного появления */
 .delay-100 { animation-delay: 0.2s; }
 .delay-200 { animation-delay: 0.4s; }

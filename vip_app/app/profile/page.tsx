@@ -261,31 +261,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-          {activity && (
-            <div className="card p-4 bg-gradient-to-br from-sky-500/15 to-blue-500/10 border border-white/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-sm text-white/70">
-                  {language === 'en' ? 'Activity level' : 'Уровень активности'}
-                </div>
-                <div className="text-sm font-semibold text-sky-300">{activity.label}</div>
-              </div>
-              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-sky-400 to-blue-500"
-                  style={{ width: `${activity.progress}%` }}
-                />
-              </div>
-              <div className="mt-2 text-xs text-white/60 flex items-center justify-between">
-                <span>
-                  {language === 'en' ? 'Operations' : 'Операций'}: {activity.totalOps}
-                </span>
-                <span>
-                  {activity.nextLabel} {activity.nextTarget}
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Последние операции */}
           {stats.recentTransactions.length > 0 && (
             <div className="card p-4">
