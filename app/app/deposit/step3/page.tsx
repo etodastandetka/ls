@@ -162,7 +162,7 @@ function QRCodeWithText({ url }: { url: string }) {
       <section className="card space-y-2">
         <div className="label text-center text-xs">QR-код для оплаты</div>
         <div className="flex justify-center">
-          <div className="w-48 h-48 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
+          <div className="w-40 h-40 rounded-lg border border-white/20 bg-white/10 animate-pulse"></div>
         </div>
       </section>
     )
@@ -174,17 +174,17 @@ function QRCodeWithText({ url }: { url: string }) {
       <div className="flex justify-center">
         <div className="relative">
           {qrImageUrl ? (
-            <img 
+              <img 
               src={qrImageUrl} 
               alt="QR код для оплаты" 
-                className="w-full max-w-[360px] h-auto rounded-lg border border-white/20"
+                className="w-full max-w-[280px] h-auto rounded-lg border border-white/20"
               onError={(e) => {
                 console.error('Error loading QR image')
                 e.currentTarget.style.display = 'none'
               }}
             />
           ) : (
-              <div className="w-full max-w-[360px] h-[260px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
+              <div className="w-full max-w-[280px] h-[200px] rounded-lg border border-white/20 bg-white/10 flex items-center justify-center">
               <div className="text-white/50">Загрузка QR-кода...</div>
             </div>
           )}
@@ -955,6 +955,7 @@ function DepositStep3Content() {
       back: 'Назад',
       loading: 'Создание заявки...',
       uploadReceipt: 'Загрузить чек об оплате',
+      uploadReceiptButton: 'Выбрать файл',
       receiptUploaded: 'Чек загружен',
       uploadReceiptDesc: 'Загрузите скриншот или фото чека об оплате',
       receiptFileTypes: 'PNG, JPG до 20MB',
@@ -978,6 +979,7 @@ function DepositStep3Content() {
       back: 'Back',
       loading: 'Creating request...',
       uploadReceipt: 'Upload payment receipt',
+      uploadReceiptButton: 'Choose file',
       receiptUploaded: 'Receipt uploaded',
       uploadReceiptDesc: 'Upload a screenshot or photo of the payment receipt',
       receiptFileTypes: 'PNG, JPG up to 20MB',
@@ -1001,6 +1003,7 @@ function DepositStep3Content() {
       back: 'Артка',
       loading: 'Өтүнүч түзүлүүдө...',
       uploadReceipt: 'Төлөм чегин жүктөө',
+      uploadReceiptButton: 'Файлды тандаңыз',
       receiptUploaded: 'Чек жүктөлдү',
       uploadReceiptDesc: 'Төлөм чегинин скриншотун же сүрөтүн жүктөңүз',
       receiptFileTypes: 'PNG, JPG 20MB чейин',
@@ -1024,6 +1027,7 @@ function DepositStep3Content() {
       back: 'Orqaga',
       loading: 'So\'rov yaratilmoqda...',
       uploadReceipt: 'To\'lov kvitansiyasini yuklash',
+      uploadReceiptButton: 'Faylni tanlang',
       receiptUploaded: 'Kvitansiya yuklandi',
       uploadReceiptDesc: 'To\'lov kvitansiyasining skrinshotini yoki rasmini yuklang',
       receiptFileTypes: 'PNG, JPG 20MB gacha',
@@ -1233,7 +1237,7 @@ function DepositStep3Content() {
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-medium text-white group-hover:text-green-300 transition-colors">
-                    {receiptFile ? 'Файл выбран' : (uploadingReceipt ? t.uploading : t.uploadReceipt)}
+                    {receiptFile ? 'Файл выбран' : (uploadingReceipt ? t.uploading : t.uploadReceiptButton)}
                   </p>
                   <p className="text-[11px] text-white/60 mt-1">
                     {receiptFile ? receiptFile.name : t.receiptFileTypes}
