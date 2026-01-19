@@ -483,6 +483,24 @@ export default function HomePage() {
       <FixedHeaderControls />
 
       <div className="wb-wrap space-y-6">
+        {/* Резервируем место под виджет входа, чтобы не было сдвига */}
+        {!authReady && !isTelegramWebApp && (
+          <section className="wb-section" style={{ textAlign: 'center', padding: '1rem' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(79, 169, 255, 0.08), rgba(47, 129, 230, 0.06))',
+              border: '1px solid rgba(79, 169, 255, 0.18)',
+              borderRadius: '16px',
+              padding: '1.5rem 1.25rem',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(79, 169, 255, 0.08) inset',
+              position: 'relative',
+              overflow: 'hidden',
+              maxWidth: '400px',
+              margin: '0 auto',
+              minHeight: '180px',
+            }} />
+          </section>
+        )}
         {/* Показываем виджет входа только если НЕ в Telegram Mini App (для обычного сайта) и пользователь не авторизован */}
         {authReady && !user && !isTelegramWebApp && (
           <section className="wb-section" style={{ textAlign: 'center', padding: '1rem' }}>
