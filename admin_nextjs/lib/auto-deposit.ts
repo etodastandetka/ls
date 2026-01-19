@@ -441,6 +441,8 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           source: true,
           amount: true,
           bookmaker: true,
+          createdAt: true,
+          processedAt: true,
         },
       })
       
@@ -449,10 +451,27 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         const isFromBot = source === 'bot' || !source
         
         if (isFromBot && fullRequest.userId) {
+          const formatDuration = (start?: Date | string | null, end?: Date | string | null) => {
+            if (!start || !end) return null
+            const startDate = typeof start === 'string' ? new Date(start) : start
+            const endDate = typeof end === 'string' ? new Date(end) : end
+            const diffMs = endDate.getTime() - startDate.getTime()
+            if (Number.isNaN(diffMs) || diffMs < 0) return null
+            const totalSeconds = Math.round(diffMs / 1000)
+            if (totalSeconds < 60) return `${totalSeconds}с`
+            const minutes = Math.floor(totalSeconds / 60)
+            const seconds = totalSeconds % 60
+            if (minutes < 60) return `${minutes}м ${seconds}с`
+            const hours = Math.floor(minutes / 60)
+            const remMinutes = minutes % 60
+            return `${hours}ч ${remMinutes}м`
+          }
+
+          const closedDuration = formatDuration(fullRequest.createdAt, fullRequest.processedAt || new Date())
           const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
             `💰 Сумма: ${fullRequest.amount} сом\n` +
-            `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
-            `🆔 ID заявки: #${request.id}`
+            `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}` +
+            (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           
           // Импортируем функцию отправки уведомления
           const botToken = process.env.BOT_TOKEN

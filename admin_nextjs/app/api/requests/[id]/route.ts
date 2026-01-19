@@ -266,6 +266,22 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const formatDuration = (start?: Date | string | null, end?: Date | string | null) => {
+    if (!start || !end) return null
+    const startDate = typeof start === 'string' ? new Date(start) : start
+    const endDate = typeof end === 'string' ? new Date(end) : end
+    const diffMs = endDate.getTime() - startDate.getTime()
+    if (Number.isNaN(diffMs) || diffMs < 0) return null
+    const totalSeconds = Math.round(diffMs / 1000)
+    if (totalSeconds < 60) return `${totalSeconds}с`
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    if (minutes < 60) return `${minutes}м ${seconds}с`
+    const hours = Math.floor(minutes / 60)
+    const remMinutes = minutes % 60
+    return `${hours}ч ${remMinutes}м`
+  }
+
   try {
     const authUser = requireAuth(request)
 
@@ -295,6 +311,7 @@ export async function PATCH(
         amount: true,
         bookmaker: true,
         status: true,
+        createdAt: true,
         source: true, // Добавляем source для проверки источника заявки
       },
     })
@@ -334,23 +351,28 @@ export async function PATCH(
       if (requestBeforeUpdate.userId) {
         let notificationMessage = ''
         
+        const closedDuration = formatDuration(
+          requestBeforeUpdate.createdAt,
+          updateData.processedAt || updatedRequest.processedAt || new Date()
+        )
+
         if (body.status === 'completed' || body.status === 'approved' || body.status === 'autodeposit_success' || body.status === 'auto_completed') {
           if (requestBeforeUpdate.requestType === 'deposit') {
             notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
               `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-              `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}\n` +
-              `🆔 ID заявки: #${id}`
+              `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+              (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           } else if (requestBeforeUpdate.requestType === 'withdraw') {
             notificationMessage = `✅ <b>Заявка на вывод одобрена!</b>\n\n` +
               `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-              `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}\n` +
-              `🆔 ID заявки: #${id}`
+              `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+              (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           }
         } else if (body.status === 'rejected') {
           notificationMessage = `❌ <b>Заявка отклонена</b>\n\n` +
             `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-            `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}\n` +
-            `🆔 ID заявки: #${id}`
+            `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+            (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           
           if (body.statusDetail) {
             notificationMessage += `\n\nПричина: ${body.statusDetail}`

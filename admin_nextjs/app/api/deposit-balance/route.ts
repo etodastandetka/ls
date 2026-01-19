@@ -131,10 +131,27 @@ export async function POST(request: NextRequest) {
     const isFromBot = source === 'bot' || !source
     
     if (isFromBot && requestData.userId) {
+      const formatDuration = (start?: Date | string | null, end?: Date | string | null) => {
+        if (!start || !end) return null
+        const startDate = typeof start === 'string' ? new Date(start) : start
+        const endDate = typeof end === 'string' ? new Date(end) : end
+        const diffMs = endDate.getTime() - startDate.getTime()
+        if (Number.isNaN(diffMs) || diffMs < 0) return null
+        const totalSeconds = Math.round(diffMs / 1000)
+        if (totalSeconds < 60) return `${totalSeconds}с`
+        const minutes = Math.floor(totalSeconds / 60)
+        const seconds = totalSeconds % 60
+        if (minutes < 60) return `${minutes}м ${seconds}с`
+        const hours = Math.floor(minutes / 60)
+        const remMinutes = minutes % 60
+        return `${hours}ч ${remMinutes}м`
+      }
+
+      const closedDuration = formatDuration(requestData.createdAt, updatedRequest.processedAt || new Date())
       const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
         `💰 Сумма: ${amount} сом\n` +
-        `🎰 Казино: ${bookmaker.toUpperCase()}\n` +
-        `🆔 ID заявки: #${requestId}`
+        `🎰 Казино: ${bookmaker.toUpperCase()}` +
+        (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
       
       // Отправляем уведомление асинхронно, не блокируя ответ
       sendTelegramNotification(requestData.userId, notificationMessage)
