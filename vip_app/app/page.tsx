@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import ServiceStatus from "../components/ServiceStatus"
 import FixedHeaderControls from "../components/FixedHeaderControls"
 import { useLanguage } from "../components/LanguageContext"
@@ -120,6 +121,7 @@ function HolidayEffects() {
 
 
 export default function HomePage() {
+  const router = useRouter()
   const { language } = useLanguage()
   const { settings } = useBotSettings()
   
@@ -621,18 +623,21 @@ export default function HomePage() {
               <a 
                 href="/deposit" 
                 className="wb-primary wb-primary-dep"
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.preventDefault()
-                  const userId = getTelegramUserId()
-                  if (userId) {
-                    const isBlocked = await checkUserBlocked(userId)
-                    if (isBlocked) {
-                      alert('Ваш аккаунт заблокирован!')
-                      window.location.href = '/blocked'
-                      return
+                  const handleClick = async () => {
+                    const userId = getTelegramUserId()
+                    if (userId) {
+                      const isBlocked = await checkUserBlocked(userId)
+                      if (isBlocked) {
+                        alert('Ваш аккаунт заблокирован!')
+                        router.push('/blocked')
+                        return
+                      }
                     }
+                    router.push('/deposit')
                   }
-                  window.location.href = '/deposit'
+                  handleClick()
                 }}
               >
                 <div className="wb-primary-left">
@@ -660,18 +665,21 @@ export default function HomePage() {
               <a 
                 href="/withdraw" 
                 className="wb-primary wb-primary-wdr"
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.preventDefault()
-                  const userId = getTelegramUserId()
-                  if (userId) {
-                    const isBlocked = await checkUserBlocked(userId)
-                    if (isBlocked) {
-                      alert('Ваш аккаунт заблокирован!')
-                      window.location.href = '/blocked'
-                      return
+                  const handleClick = async () => {
+                    const userId = getTelegramUserId()
+                    if (userId) {
+                      const isBlocked = await checkUserBlocked(userId)
+                      if (isBlocked) {
+                        alert('Ваш аккаунт заблокирован!')
+                        router.push('/blocked')
+                        return
+                      }
                     }
+                    router.push('/withdraw')
                   }
-                  window.location.href = '/withdraw'
+                  handleClick()
                 }}
               >
                 <div className="wb-primary-left">
