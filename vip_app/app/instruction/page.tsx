@@ -323,7 +323,12 @@ export default function InstructionPage() {
         </div>
         <div className="space-y-3">
           {t.importantNotes.map((note, index) => (
-            <div key={index} className="flex items-start gap-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+            <div
+              key={index}
+              data-step-reveal="true"
+              className="step-reveal flex items-start gap-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20"
+              style={{ transitionDelay: `${index * 80}ms` }}
+            >
               <span className="text-2xl flex-shrink-0">{note.icon}</span>
               <p className="text-sm text-white/90 leading-relaxed flex-1">{note.text}</p>
             </div>
