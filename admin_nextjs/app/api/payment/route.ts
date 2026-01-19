@@ -196,6 +196,24 @@ export async function POST(request: NextRequest) {
       bank: finalBank
     })
 
+    // 🚫 Блокировка пользователей: не принимаем заявки от заблокированных
+    if (!finalUserId) {
+      return NextResponse.json(
+        createApiResponse(null, 'User ID is required'),
+        { status: 400 }
+      )
+    }
+    const blockedUser = await prisma.botUser.findUnique({
+      where: { userId: BigInt(finalUserId) },
+      select: { isActive: true },
+    })
+    if (blockedUser?.isActive === false) {
+      return NextResponse.json(
+        createApiResponse(null, 'User is blocked'),
+        { status: 403 }
+      )
+    }
+
     // 🛡️ КРИТИЧНАЯ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: проверяем ДО создания заявки
     // Для ВЫВОДА: проверяем, включены ли выводы и нет ли уже pending заявки
     if (type === 'withdraw' && finalUserId) {

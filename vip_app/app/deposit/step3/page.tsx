@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useLanguage } from '../../../components/LanguageContext'
 import BankButtons from '../../../components/BankButtons'
 import { getApiBase, safeFetch } from '../../../utils/fetch'
-import { getTelegramUserId, getTelegramUser } from '../../../utils/telegram'
+import { getTelegramUserId, getTelegramUser, checkUserBlocked } from '../../../utils/telegram'
 import { DEPOSIT_CONFIG } from '../../../config/app'
 import { compressImage, fileToBase64 } from '../../../utils/imageCompression'
 import { useRequireAuth } from '../../../hooks/useRequireAuth'
@@ -765,6 +765,14 @@ function DepositStep3Content() {
         return
       }
 
+      const isBlocked = await checkUserBlocked(userId)
+      if (isBlocked) {
+        alert('Ваш аккаунт заблокирован. Заявка не может быть отправлена.')
+        router.push('/blocked')
+        setLoading(false)
+        return
+      }
+
       const base = getApiBase()
       // ВАЖНО: Используем точную сумму из URL (с копейками), не округляем
       const amountWithCents = parseFloat(amount)
@@ -839,6 +847,12 @@ function DepositStep3Content() {
           } catch (e) {}
 
           const errorMessage = errorData?.error || errorData?.message || `Ошибка сервера: ${response.status}`
+          if (response.status === 403 || /blocked/i.test(errorMessage)) {
+            alert('Ваш аккаунт заблокирован. Заявка не может быть отправлена.')
+            router.push('/blocked')
+            setLoading(false)
+            return
+          }
           alert(`${t.paymentConfirmError}: ${errorMessage}`)
           setLoading(false)
           return
@@ -846,6 +860,12 @@ function DepositStep3Content() {
 
         const data = await response.json()
         if (!data.success) {
+          if (/blocked/i.test(data.error || '')) {
+            alert('Ваш аккаунт заблокирован. Заявка не может быть отправлена.')
+            router.push('/blocked')
+            setLoading(false)
+            return
+          }
           alert(`${t.paymentConfirmError}: ${data.error}`)
           setLoading(false)
           return
