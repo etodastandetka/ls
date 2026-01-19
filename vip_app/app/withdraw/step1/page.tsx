@@ -6,6 +6,7 @@ import BookmakerGrid from '../../../components/BookmakerGrid'
 import { useLanguage } from '../../../components/LanguageContext'
 import { getApiBase } from '../../../utils/fetch'
 import { useRequireAuth } from '../../../hooks/useRequireAuth'
+import { getTelegramUserId, checkUserBlocked } from '../../../utils/telegram'
 
 
 declare global {
@@ -163,10 +164,24 @@ export default function WithdrawStep1() {
   const [disabledCasinos, setDisabledCasinos] = useState<string[]>([])
 
   useEffect(() => {
+    async function checkBlocked() {
+      const userId = getTelegramUserId()
+      if (userId) {
+        const isBlocked = await checkUserBlocked(userId)
+        if (isBlocked) {
+          alert('Ваш аккаунт заблокирован!')
+          router.push('/blocked')
+          return
+        }
+      }
+    }
+    checkBlocked()
+  }, [router])
+
+  useEffect(() => {
     async function checkSettings() {
       try {
         const base = getApiBase()
-        const { getTelegramUserId } = await import('../../../utils/telegram')
         const telegramUserId = getTelegramUserId()
         const url = telegramUserId 
           ? `${base}/api/public/payment-settings?user_id=${telegramUserId}`

@@ -767,7 +767,7 @@ function DepositStep3Content() {
 
       const isBlocked = await checkUserBlocked(userId)
       if (isBlocked) {
-        alert('Ваш аккаунт заблокирован. Заявка не может быть отправлена.')
+        alert('Ваш аккаунт заблокирован!')
         router.push('/blocked')
         setLoading(false)
         return
@@ -848,7 +848,7 @@ function DepositStep3Content() {
 
           const errorMessage = errorData?.error || errorData?.message || `Ошибка сервера: ${response.status}`
           if (response.status === 403 || /blocked/i.test(errorMessage)) {
-            alert('Ваш аккаунт заблокирован. Заявка не может быть отправлена.')
+            alert('Ваш аккаунт заблокирован!')
             router.push('/blocked')
             setLoading(false)
             return
@@ -861,7 +861,7 @@ function DepositStep3Content() {
         const data = await response.json()
         if (!data.success) {
           if (/blocked/i.test(data.error || '')) {
-            alert('Ваш аккаунт заблокирован. Заявка не может быть отправлена.')
+            alert('Ваш аккаунт заблокирован!')
             router.push('/blocked')
             setLoading(false)
             return

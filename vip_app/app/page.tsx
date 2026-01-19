@@ -5,7 +5,7 @@ import ServiceStatus from "../components/ServiceStatus"
 import FixedHeaderControls from "../components/FixedHeaderControls"
 import { useLanguage } from "../components/LanguageContext"
 import { useBotSettings } from "../components/SettingsLoader"
-import { initTelegramWebApp, syncWithBot, TelegramUser, getTelegramUser, clearTelegramUserCache } from "../utils/telegram"
+import { initTelegramWebApp, syncWithBot, TelegramUser, getTelegramUser, clearTelegramUserCache, getTelegramUserId, checkUserBlocked } from "../utils/telegram"
 import { useHomePageData } from "../hooks/useHomePageData"
 import { HistoryIcon, InstructionIcon, SupportIcon } from "../components/Icons"
 import UserProfile from "../components/UserProfile"
@@ -618,7 +618,23 @@ export default function HomePage() {
 
           <div className="wb-actions">
             <ServiceStatus service="deposits">
-              <a href="/deposit" className="wb-primary wb-primary-dep">
+              <a 
+                href="/deposit" 
+                className="wb-primary wb-primary-dep"
+                onClick={async (e) => {
+                  e.preventDefault()
+                  const userId = getTelegramUserId()
+                  if (userId) {
+                    const isBlocked = await checkUserBlocked(userId)
+                    if (isBlocked) {
+                      alert('Ваш аккаунт заблокирован!')
+                      window.location.href = '/blocked'
+                      return
+                    }
+                  }
+                  window.location.href = '/deposit'
+                }}
+              >
                 <div className="wb-primary-left">
                   <div className="wb-primary-icon">
                     <svg className="wb-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -641,7 +657,23 @@ export default function HomePage() {
             </ServiceStatus>
 
             <ServiceStatus service="withdrawals">
-              <a href="/withdraw" className="wb-primary wb-primary-wdr">
+              <a 
+                href="/withdraw" 
+                className="wb-primary wb-primary-wdr"
+                onClick={async (e) => {
+                  e.preventDefault()
+                  const userId = getTelegramUserId()
+                  if (userId) {
+                    const isBlocked = await checkUserBlocked(userId)
+                    if (isBlocked) {
+                      alert('Ваш аккаунт заблокирован!')
+                      window.location.href = '/blocked'
+                      return
+                    }
+                  }
+                  window.location.href = '/withdraw'
+                }}
+              >
                 <div className="wb-primary-left">
                   <div className="wb-primary-icon">
                     <svg className="wb-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">

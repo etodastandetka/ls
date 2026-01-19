@@ -442,7 +442,7 @@ export default function WithdrawStep3() {
       
       const isBlocked = await checkUserBlocked(telegramUserId)
       if (isBlocked) {
-        alert('Ваш аккаунт заблокирован. Вы не можете создавать заявки на вывод.')
+        alert('Ваш аккаунт заблокирован!')
         window.location.href = '/blocked'
         return
       }
