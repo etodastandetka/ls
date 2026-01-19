@@ -690,7 +690,12 @@ export default function HomePage() {
               </div>
             </a>
 
-            <a href="/support" className="wb-row">
+            <a
+              href="https://t.me/operator_luxon_bot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="wb-row"
+            >
               <div className="wb-row-left">
                 <div className="wb-row-icon wb-i-orange">
                   <SupportIcon className="wb-row-svg" />
