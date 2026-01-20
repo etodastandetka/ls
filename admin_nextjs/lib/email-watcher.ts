@@ -516,11 +516,12 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
         
         console.log('✅ Real-time mode active - listening for new emails...')
         
-        // Быстрый polling если IDLE не работает (каждые 5 секунд вместо 60)
-        // Это почти как реальное время, но с небольшой задержкой
+        // Быстрый polling если IDLE не работает (каждую секунду для быстрого автопополнения)
         idleInterval = setInterval(async () => {
           try {
             await checkEmails(settings)
+            // Сбрасываем счетчик при успехе
+            consecutiveNetworkErrors = 0
           } catch (error: any) {
             if (error.textCode === 'AUTHENTICATIONFAILED') {
               console.error('❌ Authentication failed in polling!')
@@ -532,10 +533,27 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
               reject(error)
               return
             }
-            // Обрабатываем сетевые ошибки (DNS, таймауты) - не логируем как критичные
+            // Обрабатываем сетевые ошибки (DNS, таймауты)
             if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
               consecutiveNetworkErrors++
               const now = Date.now()
+              
+              // При множественных DNS ошибках останавливаем интервал и переподключаемся
+              if (consecutiveNetworkErrors >= 10) {
+                console.warn(`⚠️ Too many network errors (${consecutiveNetworkErrors}), stopping polling and reconnecting...`)
+                if (idleInterval) {
+                  clearInterval(idleInterval)
+                  idleInterval = null
+                }
+                // Закрываем соединение и разрешаем переподключение
+                try {
+                  imap.end()
+                } catch (e) {
+                  // Игнорируем ошибки
+                }
+                resolve() // Разрешаем промис для переподключения
+                return
+              }
               
               // Логируем только если прошло достаточно времени и есть несколько ошибок подряд
               if (consecutiveNetworkErrors >= MAX_CONSECUTIVE_ERRORS_BEFORE_LOG && 
@@ -547,7 +565,7 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
               return
             }
             
-            // Сбрасываем счетчик при других ошибках или успехе
+            // Сбрасываем счетчик при других ошибках
             consecutiveNetworkErrors = 0
             console.error('Error in quick polling:', error.message || error)
           }
@@ -582,25 +600,47 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
         consecutiveNetworkErrors++
         const now = Date.now()
         
+        // Вычисляем задержку перед переподключением (экспоненциальная задержка)
+        let reconnectDelay = 10000 // 10 секунд по умолчанию
+        if (consecutiveNetworkErrors >= 100) {
+          reconnectDelay = 300000 // 5 минут при 100+ ошибках
+        } else if (consecutiveNetworkErrors >= 50) {
+          reconnectDelay = 120000 // 2 минуты при 50+ ошибках
+        } else if (consecutiveNetworkErrors >= 20) {
+          reconnectDelay = 60000 // 1 минута при 20+ ошибках
+        } else if (consecutiveNetworkErrors >= 10) {
+          reconnectDelay = 30000 // 30 секунд при 10+ ошибках
+        }
+        
         // Логируем только если прошло достаточно времени и есть несколько ошибок подряд
         if (consecutiveNetworkErrors >= MAX_CONSECUTIVE_ERRORS_BEFORE_LOG && 
             (now - lastNetworkErrorLog) > NETWORK_ERROR_LOG_INTERVAL) {
-          console.warn(`⚠️ IMAP network error (${(err as any).code}): ${err.message || err} (${consecutiveNetworkErrors} consecutive errors)`)
+          console.warn(`⚠️ IMAP network error (${(err as any).code}): ${err.message || err} (${consecutiveNetworkErrors} consecutive errors, reconnecting in ${reconnectDelay/1000}s)`)
           lastNetworkErrorLog = now
         }
-        // Закрываем соединение
+        
+        // Закрываем соединение и интервалы
         try {
-          if (idleInterval) clearInterval(idleInterval)
-          if (keepAliveInterval) clearInterval(keepAliveInterval)
+          if (idleInterval) {
+            clearInterval(idleInterval)
+            idleInterval = null
+          }
+          if (keepAliveInterval) {
+            clearInterval(keepAliveInterval)
+            keepAliveInterval = null
+          }
           imap.end()
         } catch (e) {
           // Игнорируем ошибки при закрытии
         }
-        // Переподключаемся через небольшую задержку (через resolve, чтобы основной цикл перезапустил)
+        
+        // Переподключаемся с задержкой (через resolve, чтобы основной цикл перезапустил)
         setTimeout(() => {
-          console.log('🔄 Will reconnect after network error...')
+          if (consecutiveNetworkErrors % 10 === 0 || consecutiveNetworkErrors < 10) {
+            console.log(`🔄 Reconnecting after network error (attempt ${consecutiveNetworkErrors})...`)
+          }
           resolve() // Разрешаем промис, чтобы основной цикл перезапустил подключение
-        }, 10000) // Переподключаемся через 10 секунд
+        }, reconnectDelay)
         // Не reject, чтобы не прерывать цикл переподключения
       } else {
         console.error('❌ IMAP connection error:', err)
@@ -612,9 +652,18 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
     })
 
     imap.once('end', () => {
-      console.log('⚠️ IMAP connection ended, reconnecting...')
-      if (idleInterval) clearInterval(idleInterval)
-      if (keepAliveInterval) clearInterval(keepAliveInterval)
+      if (idleInterval) {
+        clearInterval(idleInterval)
+        idleInterval = null
+      }
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval)
+        keepAliveInterval = null
+      }
+      // Только логируем если это не было вызвано сетевой ошибкой (она уже залогировала)
+      if (consecutiveNetworkErrors === 0) {
+        console.log('⚠️ IMAP connection ended, will reconnect...')
+      }
       resolve()
     })
 
