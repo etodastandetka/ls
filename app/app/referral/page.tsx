@@ -421,6 +421,8 @@ export default function ReferralPage() {
       copyLink: 'Скопировать ссылку',
       shareLink: 'Поделиться ссылкой',
       earned: 'Заработано с рефералов',
+      balance: 'Доступный баланс',
+      monthlyEarned: 'Заработано в этом месяце',
       referrals: 'Количество рефералов',
       nextPayout: 'Следующая выплата',
       howItWorks: 'Как это работает',
@@ -450,6 +452,8 @@ export default function ReferralPage() {
       copyLink: 'Copy link',
       shareLink: 'Share link',
       earned: 'Earned from referrals',
+      balance: 'Available Balance',
+      monthlyEarned: 'Earned this month',
       referrals: 'Number of referrals',
       nextPayout: 'Next payout',
       howItWorks: 'How it works',
@@ -639,8 +643,8 @@ export default function ReferralPage() {
               </svg>
             </div>
           </div>
-          <div className="text-2xl font-bold text-green-300">{earned} сом</div>
-          <div className="text-sm text-white/70">{t.earned}</div>
+          <div className="text-2xl font-bold text-green-300">{availableBalance.toLocaleString()} сом</div>
+          <div className="text-sm text-white/70">{t.balance}</div>
         </div>
         <div className="card text-center space-y-2 border-white/10 bg-gradient-to-br from-emerald-500/15 to-teal-500/10">
           <div className="flex items-center justify-center">
@@ -654,6 +658,15 @@ export default function ReferralPage() {
           <div className="text-sm text-white/70">{t.referrals}</div>
         </div>
       </div>
+
+      {/* Месячный заработок (для рейтинга) */}
+      {earned > 0 && (
+        <section className="card bg-blue-500/10 border border-blue-500/20 text-center space-y-1 py-2">
+          <div className="text-xs text-white/60">{t.monthlyEarned}</div>
+          <div className="text-lg font-semibold text-blue-300">{earned.toLocaleString()} сом</div>
+          <div className="text-xs text-white/50">Для участия в рейтинге</div>
+        </section>
+      )}
 
       {/* Отладочная информация (временно для диагностики) */}
       <section className="card bg-gray-800/50 border border-gray-600 text-xs text-white/60 p-3 mb-4">
