@@ -179,7 +179,11 @@ export default function ReferralPage() {
         if (data && data.success === true) {
           // Обрабатываем данные, даже если они нулевые (это нормально для нового пользователя)
           const earnedValue = typeof data.earned === 'number' ? data.earned : 0
-          const availableBalanceValue = typeof data.available_balance === 'number' ? data.available_balance : 0
+          let availableBalanceValue = typeof data.available_balance === 'number' ? data.available_balance : 0
+          // Если баланс отрицательный (были старые выводы), используем заработанное
+          if (availableBalanceValue < 0) {
+            availableBalanceValue = earnedValue
+          }
           const referralCountValue = typeof data.total_referrals === 'number' ? data.total_referrals : (typeof data.referral_count === 'number' ? data.referral_count : 0)
           
           setEarned(earnedValue)

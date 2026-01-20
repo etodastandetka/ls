@@ -457,7 +457,13 @@ export async function GET(request: NextRequest) {
     }, 0)
     
     // Доступный баланс = заработанное - выведенное (pending заявки НЕ уменьшают баланс)
-    const availableBalance = earned - totalWithdrawn
+    // Если баланс отрицательный, значит были выведены средства до того, как появились earnings
+    // В этом случае доступный баланс = заработанное (новые earnings)
+    let availableBalance = earned - totalWithdrawn
+    if (availableBalance < 0) {
+      console.log(`⚠️ [Referral Data API] availableBalance отрицательный (${availableBalance}), используем earned (${earned})`)
+      availableBalance = earned // Если баланс отрицательный, используем заработанное
+    }
     
     // Проверяем, есть ли pending заявки (для информации, но они не влияют на баланс)
     const pendingWithdrawals = await prisma.referralWithdrawalRequest.findMany({
