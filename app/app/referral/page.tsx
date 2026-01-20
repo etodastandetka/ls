@@ -106,9 +106,8 @@ export default function ReferralPage() {
         setIsFromBot(false)
         setError(null)
         // Загружаем только топ игроков (без user_id)
-        const apiEndpoint = typeof window !== 'undefined' 
-          ? `${window.location.origin}/api/public/referral-data?top_only=true`
-          : `/api/public/referral-data?top_only=true`
+        const apiUrl = getApiBase()
+        const apiEndpoint = `${apiUrl}/api/public/referral-data?top_only=true`
         
         try {
           const data = await safeFetchJson<any>(apiEndpoint, {
@@ -161,10 +160,9 @@ export default function ReferralPage() {
       
       console.log('🔗 Реферальная ссылка сгенерирована:', link)
 
-      // Загружаем данные рефералов с API (используем локальный endpoint)
-      const apiEndpoint = typeof window !== 'undefined' 
-        ? `${window.location.origin}/api/public/referral-data?user_id=${userId}`
-        : `/api/public/referral-data?user_id=${userId}`
+      // Загружаем данные рефералов с API (из админки)
+      const apiUrl = getApiBase()
+      const apiEndpoint = `${apiUrl}/api/public/referral-data?user_id=${userId}`
       
       try {
         const data = await safeFetchJson<any>(apiEndpoint, {
