@@ -449,21 +449,27 @@ export async function GET(request: NextRequest) {
       where: {
         userId: userIdBigInt,
         status: 'completed'
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     })
     
-    const totalWithdrawn = completedWithdrawals.reduce((sum, w) => {
+    // Считаем выведенное, но не более чем заработанное
+    // Это защищает от ситуации, когда были выводы до появления earnings
+    let totalWithdrawn = completedWithdrawals.reduce((sum, w) => {
       return sum + (w.amount ? parseFloat(w.amount.toString()) : 0)
     }, 0)
     
-    // Доступный баланс = заработанное - выведенное (pending заявки НЕ уменьшают баланс)
-    // Если баланс отрицательный, значит были выведены средства до того, как появились earnings
-    // В этом случае доступный баланс = заработанное (новые earnings)
-    let availableBalance = earned - totalWithdrawn
-    if (availableBalance < 0) {
-      console.log(`⚠️ [Referral Data API] availableBalance отрицательный (${availableBalance}), используем earned (${earned})`)
-      availableBalance = earned // Если баланс отрицательный, используем заработанное
+    // Если выведено больше чем заработано, значит были старые выводы
+    // В этом случае считаем, что выведено = заработано (все старые выводы "покрыты" новыми earnings)
+    if (totalWithdrawn > earned) {
+      console.log(`⚠️ [Referral Data API] Выведено (${totalWithdrawn}) больше чем заработано (${earned}). Вероятно старые выводы. Ограничиваем выведенное до заработанного.`)
+      totalWithdrawn = earned
     }
+    
+    // Доступный баланс = заработанное - выведенное (pending заявки НЕ уменьшают баланс)
+    const availableBalance = earned - totalWithdrawn
     
     // Проверяем, есть ли pending заявки (для информации, но они не влияют на баланс)
     const pendingWithdrawals = await prisma.referralWithdrawalRequest.findMany({
