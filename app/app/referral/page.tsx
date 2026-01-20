@@ -667,19 +667,6 @@ export default function ReferralPage() {
         </section>
       ) : null}
 
-      {/* Сообщение если баланс меньше 100 сом */}
-      {availableBalance > 0 && availableBalance < 100 && (
-        <section className="card bg-yellow-500/20 border border-yellow-500/30 text-center space-y-2">
-          <div className="text-yellow-400 font-semibold">Недостаточно для вывода</div>
-          <div className="text-sm text-white/80">
-            Ваш баланс: {availableBalance.toLocaleString()} сом
-          </div>
-          <div className="text-xs text-white/60">
-            Минимальная сумма вывода: 100 сом
-          </div>
-        </section>
-      )}
-
       {/* Показываем информацию о pending заявке (если есть) */}
       {hasPendingWithdrawal && (
         <section className="card bg-blue-500/20 border border-blue-500/30 text-center space-y-2">
