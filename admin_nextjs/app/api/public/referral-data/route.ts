@@ -474,25 +474,26 @@ export async function GET(request: NextRequest) {
       }
     })
     
-    // Считаем сумму всех выводов
-    let totalWithdrawn = allCompletedWithdrawals.reduce((sum, w) => {
+    // Считаем сумму всех выводов (реальная сумма всех выводов со статусом 'completed')
+    const totalWithdrawn = allCompletedWithdrawals.reduce((sum, w) => {
       return sum + (w.amount ? parseFloat(w.amount.toString()) : 0)
     }, 0)
-    
-    // Ограничиваем выведенное суммой заработанного (защита от отрицательного баланса)
-    // Если были старые выводы до появления earnings, они не будут учитываться
-    if (totalWithdrawn > totalEarned) {
-      console.log(`⚠️ [Referral Data API] Выведено (${totalWithdrawn}) больше чем заработано (${totalEarned}). Ограничиваем выведенное до заработанного.`)
-      totalWithdrawn = totalEarned
-    }
     
     console.log(`📋 [Referral Data API] Всего completed выводов: ${allCompletedWithdrawals.length}, сумма: ${totalWithdrawn.toFixed(2)}`)
     
     // Доступный баланс = весь заработок за все время - выведенное
-    // earned - это только текущий месяц (для отображения), а для баланса используем totalEarned
-    const availableBalance = totalEarned - totalWithdrawn
+    // earned - это только текущий месяц (для отображения в рейтинге), а для баланса используем totalEarned
+    // Баланс не может быть отрицательным - минимальное значение 0
+    let availableBalance = totalEarned - totalWithdrawn
+    if (availableBalance < 0) {
+      console.log(`⚠️ [Referral Data API] Баланс отрицательный (${availableBalance.toFixed(2)}), устанавливаем 0`)
+      availableBalance = 0
+    }
     
-    console.log(`💰 [Referral Data API] Earned (текущий месяц): ${earned}, Total Earned (все время): ${totalEarned}, Withdrawn: ${totalWithdrawn.toFixed(2)}, Available: ${availableBalance.toFixed(2)}`)
+    console.log(`💰 [Referral Data API] Earned (текущий месяц для рейтинга): ${earned.toFixed(2)}`)
+    console.log(`💰 [Referral Data API] Total Earned (весь заработок за все время): ${totalEarned.toFixed(2)}`)
+    console.log(`💰 [Referral Data API] Total Withdrawn (все выведенное): ${totalWithdrawn.toFixed(2)}`)
+    console.log(`💰 [Referral Data API] Available Balance (реальный баланс): ${availableBalance.toFixed(2)}`)
     console.log(`📋 [Referral Data API] Всего completed выводов: ${allCompletedWithdrawals.length}`)
     if (allCompletedWithdrawals.length > 0) {
       allCompletedWithdrawals.forEach((w, idx) => {
