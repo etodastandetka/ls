@@ -287,14 +287,12 @@ export async function GET(request: NextRequest) {
           referrerId: userIdBigInt
         }
       }),
-      // Получаем заработанные комиссии с агрегацией (только за текущий месяц)
+      // Получаем ВСЕ заработанные комиссии (не только за текущий месяц, чтобы видеть полный баланс)
       prisma.botReferralEarning.aggregate({
         where: {
           referrerId: userIdBigInt,
-          status: 'completed',
-          createdAt: {
-            gte: monthStartDate
-          }
+          status: 'completed'
+          // Убрали фильтр по месяцу - учитываем все earnings
         },
         _sum: {
           commissionAmount: true
@@ -443,33 +441,53 @@ export async function GET(request: NextRequest) {
       prize: prizeDistribution[index] || 0
     }))
     
-    // Получаем уже выведенные средства (только completed - подтвержденные и выплаченные)
-    // pending заявки НЕ учитываются - деньги остаются на балансе
-    const completedWithdrawals = await prisma.referralWithdrawalRequest.findMany({
+    // Получаем первую запись о заработке (earnings), чтобы исключить выводы до появления earnings
+    const firstEarning = await prisma.botReferralEarning.findFirst({
       where: {
-        userId: userIdBigInt,
+        referrerId: userIdBigInt,
         status: 'completed'
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'asc'
+      },
+      select: {
+        createdAt: true
       }
     })
     
-    // Считаем выведенное, но не более чем заработанное
-    // Это защищает от ситуации, когда были выводы до появления earnings
-    let totalWithdrawn = completedWithdrawals.reduce((sum, w) => {
+    // Получаем только те выводы, которые были ПОСЛЕ первой earnings (игнорируем старые)
+    let completedWithdrawals = []
+    if (firstEarning) {
+      // Если есть earnings, учитываем только выводы после них
+      completedWithdrawals = await prisma.referralWithdrawalRequest.findMany({
+        where: {
+          userId: userIdBigInt,
+          status: 'completed',
+          createdAt: {
+            gte: firstEarning.createdAt // Только выводы после первой earnings
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      })
+      console.log(`📅 [Referral Data API] Первая earnings: ${firstEarning.createdAt.toISOString()}, учитываем только выводы после этой даты`)
+    } else {
+      // Если нет earnings вообще, не учитываем никакие выводы (старые не важны)
+      completedWithdrawals = []
+      console.log(`⚠️ [Referral Data API] Нет earnings, не учитываем выводы`)
+    }
+    
+    // Считаем выведенное (только после первой earnings)
+    const totalWithdrawn = completedWithdrawals.reduce((sum, w) => {
       return sum + (w.amount ? parseFloat(w.amount.toString()) : 0)
     }, 0)
     
-    // Если выведено больше чем заработано, значит были старые выводы
-    // В этом случае считаем, что выведено = заработано (все старые выводы "покрыты" новыми earnings)
-    if (totalWithdrawn > earned) {
-      console.log(`⚠️ [Referral Data API] Выведено (${totalWithdrawn}) больше чем заработано (${earned}). Вероятно старые выводы. Ограничиваем выведенное до заработанного.`)
-      totalWithdrawn = earned
-    }
-    
-    // Доступный баланс = заработанное - выведенное (pending заявки НЕ уменьшают баланс)
+    // Доступный баланс = заработанное - выведенное (только после первой earnings)
+    // Старые выводы игнорируются
     const availableBalance = earned - totalWithdrawn
+    
+    console.log(`💰 [Referral Data API] Earned: ${earned}, Withdrawn (after first earning): ${totalWithdrawn}, Available: ${availableBalance}`)
     
     // Проверяем, есть ли pending заявки (для информации, но они не влияют на баланс)
     const pendingWithdrawals = await prisma.referralWithdrawalRequest.findMany({
