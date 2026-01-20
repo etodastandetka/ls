@@ -5,12 +5,11 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "dev:3001": "next dev -p 3001",
-    "build": "next build",
+    "build": "npm run prisma:generate && next build",
     "start": "next start",
     "start:prod": "NODE_ENV=production next start -p 3030",
     "postinstall": "prisma generate --schema=../admin_nextjs/prisma/schema.prisma || true",
-    "prisma:generate": "prisma generate --schema=../admin_nextjs/prisma/schema.prisma",
-    "build": "npm run prisma:generate && next build"
+    "prisma:generate": "prisma generate --schema=../admin_nextjs/prisma/schema.prisma"
   },
   "prisma": {
     "schema": "../admin_nextjs/prisma/schema.prisma"
