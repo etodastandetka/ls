@@ -14,7 +14,10 @@ const ADMIN_API_BASE_URL = getAdminApiUrl()
  */
 export const API_URLS = {
   BASE: ADMIN_API_BASE_URL,
-  REFERRAL_DATA: `${ADMIN_API_BASE_URL}/api/referral-data/`,
+  // Используем локальный endpoint для рефералов (в клиентском сайте)
+  REFERRAL_DATA: typeof window !== 'undefined' 
+    ? `${window.location.origin}/api/public/referral-data` 
+    : '/api/public/referral-data',
   TRANSACTION_HISTORY: `${ADMIN_API_BASE_URL}/api/transaction-history/`,
   REQUISITES_LIST: `${ADMIN_API_BASE_URL}/api/public/requisites/list/`,
   PAYMENT: `${ADMIN_API_BASE_URL}/api/payment`,

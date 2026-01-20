@@ -19,6 +19,7 @@ export default function ReferralPage() {
   const [isFromBot, setIsFromBot] = useState(true)
   const [availableBalance, setAvailableBalance] = useState(0)
   const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false)
+  const [referralsList, setReferralsList] = useState<any[]>([])
   const [referralSettings, setReferralSettings] = useState({
     referral_percentage: 5,
     min_payout: 100,
@@ -105,8 +106,9 @@ export default function ReferralPage() {
         setIsFromBot(false)
         setError(null)
         // Загружаем только топ игроков (без user_id)
-        const apiUrl = getApiBase()
-        const apiEndpoint = `${apiUrl}/api/public/referral-data?top_only=true`
+        const apiEndpoint = typeof window !== 'undefined' 
+          ? `${window.location.origin}/api/public/referral-data?top_only=true`
+          : `/api/public/referral-data?top_only=true`
         
         try {
           const data = await safeFetchJson<any>(apiEndpoint, {
@@ -159,9 +161,10 @@ export default function ReferralPage() {
       
       console.log('🔗 Реферальная ссылка сгенерирована:', link)
 
-      // Загружаем данные рефералов с API
-      const apiUrl = getApiBase()
-      const apiEndpoint = `${apiUrl}/api/public/referral-data?user_id=${userId}`
+      // Загружаем данные рефералов с API (используем локальный endpoint)
+      const apiEndpoint = typeof window !== 'undefined' 
+        ? `${window.location.origin}/api/public/referral-data?user_id=${userId}`
+        : `/api/public/referral-data?user_id=${userId}`
       
       try {
         const data = await safeFetchJson<any>(apiEndpoint, {
@@ -188,6 +191,8 @@ export default function ReferralPage() {
           setReferralCount(referralCountValue)
           setTopPlayers(Array.isArray(data.top_players) ? data.top_players : [])
           setUserRank(typeof data.user_rank === 'number' && data.user_rank > 0 ? data.user_rank : 0)
+          // Устанавливаем список рефералов с заработком
+          setReferralsList(Array.isArray(data.referrals) ? data.referrals : [])
           
           // Обновляем настройки рефералов, если они есть
           if (data.settings) {
@@ -236,6 +241,7 @@ export default function ReferralPage() {
             setReferralCount(typeof data.total_referrals === 'number' ? data.total_referrals : (typeof data.referral_count === 'number' ? data.referral_count : 0))
             setTopPlayers(Array.isArray(data.top_players) ? data.top_players : [])
             setUserRank(typeof data.user_rank === 'number' && data.user_rank > 0 ? data.user_rank : 0)
+            setReferralsList(Array.isArray(data.referrals) ? data.referrals : [])
             setError(null)
             
             // Обновляем настройки, если они есть
@@ -261,6 +267,7 @@ export default function ReferralPage() {
             setReferralCount(0)
             setTopPlayers([])
             setUserRank(0)
+            setReferralsList([])
             // Не устанавливаем ошибку, чтобы пользователь мог видеть реферальную ссылку
             setError(null)
           }
@@ -276,7 +283,6 @@ export default function ReferralPage() {
           stack: fetchError?.stack,
           apiEndpoint,
           userId,
-          apiUrl,
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent
         })
@@ -649,6 +655,49 @@ export default function ReferralPage() {
         <section className="card bg-yellow-500/20 border border-yellow-500/30 text-center space-y-2">
           <div className="text-yellow-400 font-semibold">Заявка на вывод в обработке</div>
           <div className="text-sm text-white/80">Ожидайте подтверждения администратора</div>
+        </section>
+      )}
+
+      {/* Список рефералов с заработком */}
+      {referralsList.length > 0 && (
+        <section className="card space-y-4 border-white/10 bg-gradient-to-br from-green-500/10 via-white/5 to-emerald-500/10">
+          <div className="flex items-center space-x-2">
+            <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <h2 className="text-lg font-semibold text-white/90">Ваши рефералы</h2>
+          </div>
+          
+          <div className="space-y-3">
+            {referralsList.map((ref: any) => (
+              <div key={ref.referred_id} className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-green-500/10 to-emerald-500/5 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold">
+                      {ref.displayName?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-base">{ref.displayName}</div>
+                      <div className="text-xs text-white/60">
+                        {ref.deposits_count || 0} депозит{ref.deposits_count !== 1 ? 'ов' : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/10">
+                  <div>
+                    <div className="text-xs text-white/60 mb-1">Сумма депозитов</div>
+                    <div className="text-emerald-300 font-bold">{ref.total_deposits?.toLocaleString() || 0} сом</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-white/60 mb-1">Ваш заработок (2%)</div>
+                    <div className="text-green-300 font-bold">{ref.total_earnings?.toLocaleString() || 0} сом</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

@@ -18,6 +18,26 @@ export const SERVER_CONFIG = {
 } as const
 
 /**
+ * Конфигурация безопасности и rate limiting
+ */
+export const SECURITY_CONFIG = {
+  // Rate limiting по умолчанию
+  RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 минута
+  RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '60', 10),
+  RATE_LIMIT_BLOCK_DURATION_MS: parseInt(process.env.RATE_LIMIT_BLOCK_DURATION_MS || '86400000', 10), // 24 часа
+  
+  // Очистка rate limit store
+  RATE_LIMIT_CLEANUP_INTERVAL_MS: parseInt(process.env.RATE_LIMIT_CLEANUP_INTERVAL_MS || '300000', 10), // 5 минут
+  
+  // Максимальный размер запроса
+  MAX_REQUEST_SIZE_MB: parseInt(process.env.MAX_REQUEST_SIZE_MB || '5', 10),
+  MAX_REQUEST_SIZE_BYTES: parseInt(process.env.MAX_REQUEST_SIZE_MB || '5', 10) * 1024 * 1024,
+  
+  // Максимальная длина параметра запроса
+  MAX_PARAM_LENGTH: parseInt(process.env.MAX_PARAM_LENGTH || '1000', 10),
+} as const
+
+/**
  * Конфигурация депозитов
  */
 export const DEPOSIT_CONFIG = {
@@ -30,7 +50,6 @@ export const DEPOSIT_CONFIG = {
   // Максимальная сумма депозита
   MAX_AMOUNT: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '100000'),
 } as const
-
 /**
  * Конфигурация API запросов
  */
@@ -84,4 +103,5 @@ export function getAppConfig() {
     timer: TIMER_CONFIG,
   }
 }
+
 
