@@ -135,31 +135,93 @@ export async function POST(request: NextRequest) {
       }
     })
     
-    console.log(`✅ [Referral Withdraw Create] Заявка #${withdrawalRequest.id} создана успешно. Сумма ${amount.toFixed(2)} сом НЕ списана (остается на балансе до подтверждения админом).`)
+    console.log(`✅ [Referral Withdraw Create] Заявка #${withdrawalRequest.id} создана успешно. Начинаю автоматический вывод...`)
     
-    // Отправляем уведомление в группу о новой заявке на вывод
-    const amountStr = parseFloat(withdrawalRequest.amount.toString()).toFixed(2)
-    const usernameStr = withdrawalRequest.username || withdrawalRequest.firstName || 'Пользователь'
+    // АВТОМАТИЧЕСКИЙ ВЫВОД - сразу пополняем баланс в казино
+    const { depositToCasino } = await import('../../../../../lib/deposit-balance')
     
-    const groupMessage = `🔴 <b>Новая заявка на вывод (реферальная)</b>\n\n` +
-      `👤 Пользователь: ${usernameStr}\n` +
-      `💰 Сумма: ${amountStr} ${withdrawalRequest.currency}\n` +
-      `🎰 Казино: ${withdrawalRequest.bookmaker}\n` +
-      `🆔 ID аккаунта: ${withdrawalRequest.bookmakerAccountId}\n` +
-      `📋 ID заявки: #${withdrawalRequest.id}\n\n` +
-      `Статус: ожидает обработки`
-    
-    sendTelegramGroupMessage(groupMessage).catch(err => {
-      console.error('Failed to send referral withdrawal notification to group:', err)
-    })
-    
-    const response = NextResponse.json({
-      success: true,
-      request_id: withdrawalRequest.id,
-      message: 'Заявка на вывод создана успешно'
-    })
-    response.headers.set('Access-Control-Allow-Origin', '*')
-    return response
+    try {
+      await depositToCasino(
+        withdrawalRequest.bookmaker,
+        withdrawalRequest.bookmakerAccountId,
+        amount,
+        undefined // Для referral withdrawal не передаем requestId, так как это другая таблица
+      )
+      
+      // Обновляем статус заявки на completed (деньги автоматически выведены)
+      const updatedRequest = await prisma.referralWithdrawalRequest.update({
+        where: { id: withdrawalRequest.id },
+        data: {
+          status: 'completed',
+          processedAt: new Date(),
+          updatedAt: new Date()
+        }
+      })
+      
+      console.log(`✅ [Referral Withdraw Create] Заявка #${withdrawalRequest.id} автоматически обработана. Сумма ${amount.toFixed(2)} сом пополнена в казино.`)
+      
+      // Отправляем уведомление в группу об успешном автоматическом выводе
+      const amountStr = parseFloat(updatedRequest.amount.toString()).toFixed(2)
+      const usernameStr = updatedRequest.username || updatedRequest.firstName || 'Пользователь'
+      
+      const groupMessage = `✅ <b>Реферальный вывод (автоматический)</b>\n\n` +
+        `👤 Пользователь: ${usernameStr}\n` +
+        `💰 Сумма: ${amountStr} ${updatedRequest.currency}\n` +
+        `🎰 Казино: ${updatedRequest.bookmaker}\n` +
+        `🆔 ID аккаунта: ${updatedRequest.bookmakerAccountId}\n` +
+        `📋 ID заявки: #${updatedRequest.id}\n\n` +
+        `Статус: автоматически пополнен ✅`
+      
+      sendTelegramGroupMessage(groupMessage).catch(err => {
+        console.error('Failed to send referral withdrawal notification to group:', err)
+      })
+      
+      const response = NextResponse.json({
+        success: true,
+        request_id: withdrawalRequest.id,
+        message: 'Вывод выполнен автоматически и успешно',
+        auto_processed: true
+      })
+      response.headers.set('Access-Control-Allow-Origin', '*')
+      return response
+      
+    } catch (casinoError: any) {
+      console.error(`❌ [Referral Withdraw Create] Ошибка автоматического вывода для заявки #${withdrawalRequest.id}:`, casinoError)
+      
+      // Обновляем статус на rejected, если не удалось пополнить
+      await prisma.referralWithdrawalRequest.update({
+        where: { id: withdrawalRequest.id },
+        data: {
+          status: 'rejected',
+          adminComment: `Ошибка автоматического пополнения: ${casinoError.message}`,
+          processedAt: new Date(),
+          updatedAt: new Date()
+        }
+      })
+      
+      // Отправляем уведомление об ошибке
+      const amountStr = amount.toFixed(2)
+      const usernameStr = withdrawalRequest.username || withdrawalRequest.firstName || 'Пользователь'
+      
+      const errorMessage = `❌ <b>Ошибка реферального вывода</b>\n\n` +
+        `👤 Пользователь: ${usernameStr}\n` +
+        `💰 Сумма: ${amountStr} ${withdrawalRequest.currency}\n` +
+        `🎰 Казино: ${withdrawalRequest.bookmaker}\n` +
+        `📋 ID заявки: #${withdrawalRequest.id}\n` +
+        `⚠️ Ошибка: ${casinoError.message || 'Неизвестная ошибка'}`
+      
+      sendTelegramGroupMessage(errorMessage).catch(err => {
+        console.error('Failed to send error notification to group:', err)
+      })
+      
+      const errorResponse = NextResponse.json({
+        success: false,
+        error: `Ошибка автоматического вывода: ${casinoError.message || 'Не удалось пополнить баланс'}`,
+        request_id: withdrawalRequest.id
+      }, { status: 500 })
+      errorResponse.headers.set('Access-Control-Allow-Origin', '*')
+      return errorResponse
+    }
     
   } catch (error: any) {
     console.error('Referral withdrawal create error:', error)
