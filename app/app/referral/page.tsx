@@ -640,8 +640,8 @@ export default function ReferralPage() {
         </div>
       </div>
 
-      {/* Кнопка вывода - показывается всегда если баланс >= 100 сом */}
-      {availableBalance >= 100 && (
+      {/* Кнопка вывода - показывается если баланс >= 100 сом */}
+      {availableBalance >= 100 ? (
         <section className="card text-center space-y-3">
           <div className="text-lg font-semibold text-white">Доступно для вывода</div>
           <div className="text-3xl font-bold text-green-400">{availableBalance.toLocaleString()} сом</div>
@@ -655,7 +655,17 @@ export default function ReferralPage() {
             Вывод выполняется автоматически • Минимальная сумма: 100 сом
           </p>
         </section>
-      )}
+      ) : availableBalance > 0 ? (
+        <section className="card bg-yellow-500/20 border border-yellow-500/30 text-center space-y-2">
+          <div className="text-yellow-400 font-semibold">Недостаточно для вывода</div>
+          <div className="text-sm text-white/80">
+            Доступно: {availableBalance.toLocaleString()} сом
+          </div>
+          <div className="text-xs text-white/60">
+            Минимальная сумма вывода: 100 сом
+          </div>
+        </section>
+      ) : null}
 
       {/* Сообщение если баланс меньше 100 сом */}
       {availableBalance > 0 && availableBalance < 100 && (
