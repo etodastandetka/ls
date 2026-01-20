@@ -82,6 +82,13 @@ function ReferralWithdrawStep2Content() {
       return
     }
 
+    // Проверка минимальной суммы вывода - 100 сом
+    const minWithdrawalAmount = 100
+    if (availableBalance < minWithdrawalAmount) {
+      alert(`Минимальная сумма вывода: ${minWithdrawalAmount} сом. Ваш баланс: ${availableBalance.toFixed(2)} сом`)
+      return
+    }
+
     try {
       setLoading(true)
 
