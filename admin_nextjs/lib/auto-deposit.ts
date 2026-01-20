@@ -43,16 +43,18 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
   // Ищем заявки на пополнение со статусом pending в окне ±5 минут от платежа
   // Это защищает от случайного пополнения если пользователь не пополнял
   // И предотвращает обработку старых заявок с одинаковыми суммами
-  // ВАЖНО: Используем окно ±5 минут, чтобы найти заявки созданные до или после платежа
+  // ВАЖНО: Используем окно ±5 минут от paymentDate, чтобы найти заявки созданные до или после платежа
+  // ВАЖНО: НЕ ограничиваем окно текущим временем, чтобы находить заявки созданные после обработки платежа
   const searchWindowMs = AUTO_DEPOSIT_CONFIG.REQUEST_SEARCH_WINDOW_MS
-  const searchWindowStart = new Date(baseTime.getTime() - searchWindowMs) // 5 минут ДО платежа
-  const searchWindowEnd = new Date(baseTime.getTime() + searchWindowMs) // 5 минут ПОСЛЕ платежа
-  const now = new Date()
+  const searchWindowStart = new Date(paymentDate.getTime() - searchWindowMs) // 5 минут ДО paymentDate
+  const searchWindowEnd = new Date(paymentDate.getTime() + searchWindowMs) // 5 минут ПОСЛЕ paymentDate
   
-  // Ограничиваем поиск текущим моментом, чтобы не искать в будущем
-  const actualSearchEnd = searchWindowEnd > now ? now : searchWindowEnd
+  // Используем paymentDate как базовое время для окна поиска
+  // Это позволяет находить заявки созданные до или после фактического времени платежа
+  console.log(`🔍 [Auto-Deposit] Search window: ${searchWindowStart.toISOString()} to ${searchWindowEnd.toISOString()} (based on paymentDate: ${paymentDate.toISOString()})`)
 
-  console.log(`🔍 [Auto-Deposit] Search window: ${searchWindowStart.toISOString()} to ${actualSearchEnd.toISOString()}`)
+  // НЕ ограничиваем окно текущим временем - заявки могут быть созданы позже обработки платежа
+  const actualSearchEnd = searchWindowEnd
 
   // Оптимизированный поиск заявок - минимум запросов для максимальной скорости
   // Ищем заявки в окне ±5 минут от платежа
@@ -90,9 +92,9 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       return false
     }
     
-    // Проверяем разницу времени между заявкой и платежом
-    // Разрешаем сопоставление если заявка создана в пределах ±5 минут от платежа
-    const timeDiff = baseTime.getTime() - req.createdAt.getTime()
+    // Проверяем разницу времени между заявкой и paymentDate (реальным временем платежа)
+    // Разрешаем сопоставление если заявка создана в пределах ±5 минут от paymentDate
+    const timeDiff = paymentDate.getTime() - req.createdAt.getTime()
     const timeDiffAbs = Math.abs(timeDiff)
     const maxTimeDiff = AUTO_DEPOSIT_CONFIG.REQUEST_SEARCH_WINDOW_MS // 5 минут
     
@@ -100,7 +102,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     if (timeDiffAbs > maxTimeDiff) {
       const minutesDiff = Math.floor(timeDiffAbs / 60000)
       const direction = timeDiff > 0 ? 'after' : 'before'
-      console.log(`⚠️ [Auto-Deposit] Request ${req.id} created ${minutesDiff} minutes ${direction} payment ${paymentId} (too far apart), skipping`)
+      console.log(`⚠️ [Auto-Deposit] Request ${req.id} created ${minutesDiff} minutes ${direction} paymentDate ${paymentId} (too far apart), skipping`)
       return false
     }
     
