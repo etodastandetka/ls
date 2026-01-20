@@ -67,21 +67,25 @@ export default function ProfilePage() {
         }
       }
       
-      // Считаем все транзакции по типу (включая заявки из бота)
+      // Считаем транзакции по типу, исключая отклоненные заявки
       const deposits = allTransactions.filter((t: any) => {
         const rawType = t?.type || t?.requestType || t?.request_type
         const type = typeof rawType === 'string' ? rawType.toLowerCase() : ''
-        return type === 'deposit'
+        const status = t?.status || t?.requestStatus || ''
+        // Исключаем отклоненные заявки
+        return type === 'deposit' && status !== 'rejected'
       })
       const withdraws = allTransactions.filter((t: any) => {
         const rawType = t?.type || t?.requestType || t?.request_type
         const type = typeof rawType === 'string' ? rawType.toLowerCase() : ''
-        return type === 'withdraw' || type === 'withdrawal'
+        const status = t?.status || t?.requestStatus || ''
+        // Исключаем отклоненные заявки
+        return (type === 'withdraw' || type === 'withdrawal') && status !== 'rejected'
       })
       
       const userStats: UserStats = {
-        totalDeposits: deposits.length, // Все пополнения, включая pending, failed и т.д.
-        totalWithdraws: withdraws.length, // Все выводы, включая pending, failed и т.д.
+        totalDeposits: deposits.length, // Только успешные пополнения (без отклоненных)
+        totalWithdraws: withdraws.length, // Только успешные выводы (без отклоненных)
         totalDepositAmount: deposits
           .reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
         totalWithdrawAmount: withdraws
