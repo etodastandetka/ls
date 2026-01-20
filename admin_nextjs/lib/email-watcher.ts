@@ -583,7 +583,7 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
         // Keepalive: каждые 29 минут проверяем соединение
         keepAliveInterval = setInterval(() => {
           if (imap && imap.state !== 'authenticated') {
-            console.warn('⚠️ Connection lost, will reconnect...')
+            console.warn('⚠️ Connection lost')
             imap.end()
           }
         }, 29 * 60 * 1000)
@@ -609,8 +609,8 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
         consecutiveNetworkErrors++
         const now = Date.now()
         
-        // При критических ошибках (10+) просто останавливаемся - PM2 перезапустит процесс
-        if (consecutiveNetworkErrors >= 10) {
+        // При критических ошибках (5+) сразу останавливаемся - PM2 перезапустит процесс
+        if (consecutiveNetworkErrors >= 5) {
           console.error(`❌ Too many network errors (${consecutiveNetworkErrors}), stopping watcher. PM2 will restart the process.`)
           // Закрываем все интервалы
           try {
@@ -652,8 +652,9 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
           // Игнорируем ошибки при закрытии
         }
         
-        // Не переподключаемся - просто разрешаем промис, основной цикл попробует снова
-        resolve()
+        // Reject промис чтобы основной цикл не пытался сразу переподключаться
+        // Основной цикл поймает ошибку и остановится при критических ошибках
+        reject(err)
       } else {
         console.error('❌ IMAP connection error:', err)
         consecutiveNetworkErrors = 0 // Сбрасываем при других ошибках
@@ -674,7 +675,7 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
       }
       // Только логируем если это не было вызвано сетевой ошибкой (она уже залогировала)
       if (consecutiveNetworkErrors === 0) {
-        console.log('⚠️ IMAP connection ended, will reconnect...')
+        console.log('⚠️ IMAP connection ended')
       }
       resolve()
     })
@@ -768,6 +769,8 @@ export async function startWatcher(): Promise<void> {
       // Запускаем IDLE режим (реальное время)
       try {
         await startIdleMode(settings)
+        // Сбрасываем счетчик при успешном подключении
+        consecutiveNetworkErrors = 0
       } catch (error: any) {
         if (error.textCode === 'AUTHENTICATIONFAILED') {
           console.error('❌ IMAP Authentication Failed!')
@@ -776,20 +779,27 @@ export async function startWatcher(): Promise<void> {
           console.error(`   Password: ${settings.password ? '✓ set' : '✗ missing'}`)
           console.error('   Waiting 60 seconds before retry...')
           await new Promise((resolve) => setTimeout(resolve, 60000))
+        } else if ((error as any).code === 'ENOTFOUND' || (error as any).code === 'ETIMEDOUT' || (error as any).code === 'ECONNREFUSED') {
+          // Сетевые ошибки - при критических останавливаемся
+          consecutiveNetworkErrors++
+          if (consecutiveNetworkErrors >= 5) {
+            console.error(`❌ Too many network errors (${consecutiveNetworkErrors}), stopping watcher. PM2 will restart.`)
+            process.exit(1)
+          }
+          // При не критических ошибках просто логируем и продолжаем цикл
+          console.error('❌ Network error in IDLE mode:', error.message)
         } else {
-          // При других ошибках просто логируем и продолжаем цикл без задержек
+          // При других ошибках просто логируем и продолжаем цикл
           console.error('❌ IDLE mode error:', error.message)
-          // Не добавляем задержку - цикл сразу попробует заново
         }
       }
     } catch (error: any) {
       // При критических DNS ошибках останавливаемся - PM2 перезапустит
-      if ((error as any).code === 'ENOTFOUND' && consecutiveNetworkErrors >= 10) {
+      if ((error as any).code === 'ENOTFOUND' && consecutiveNetworkErrors >= 5) {
         console.error(`❌ Too many DNS errors (${consecutiveNetworkErrors}), stopping watcher. PM2 will restart.`)
         process.exit(1)
       }
       console.error('❌ Error in watcher:', error)
-      // Не добавляем задержку - цикл сразу попробует заново
     }
   }
 }
