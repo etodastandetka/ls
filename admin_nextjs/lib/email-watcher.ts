@@ -7,6 +7,15 @@ import { simpleParser } from 'mailparser'
 import { prisma } from './prisma'
 import { parseEmailByBank } from './email-parsers'
 import { matchAndProcessPayment } from './auto-deposit'
+import dns from 'dns'
+
+// Настраиваем надежные DNS серверы для избежания DNS ошибок
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1'])
+  console.log('✅ DNS servers configured: Google DNS (8.8.8.8, 8.8.4.4) and Cloudflare DNS (1.1.1.1, 1.0.0.1)')
+} catch (error) {
+  console.warn('⚠️ Failed to set DNS servers:', error)
+}
 
 interface WatcherSettings {
   enabled: boolean
@@ -533,25 +542,25 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
               reject(error)
               return
             }
-            // Обрабатываем сетевые ошибки (DNS, таймауты)
+            // Обрабатываем сетевые ошибки (DNS, таймауты) - просто игнорируем, не пытаемся переподключаться
             if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
               consecutiveNetworkErrors++
               const now = Date.now()
               
-              // При множественных DNS ошибках останавливаем интервал и переподключаемся
+              // При критических ошибках останавливаем интервал
               if (consecutiveNetworkErrors >= 10) {
-                console.warn(`⚠️ Too many network errors (${consecutiveNetworkErrors}), stopping polling and reconnecting...`)
+                console.warn(`⚠️ Too many network errors (${consecutiveNetworkErrors}), stopping polling...`)
                 if (idleInterval) {
                   clearInterval(idleInterval)
                   idleInterval = null
                 }
-                // Закрываем соединение и разрешаем переподключение
+                // Закрываем соединение
                 try {
                   imap.end()
                 } catch (e) {
                   // Игнорируем ошибки
                 }
-                resolve() // Разрешаем промис для переподключения
+                resolve() // Разрешаем промис - основной цикл попробует заново
                 return
               }
               
@@ -561,7 +570,7 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
                 console.warn(`⚠️ Network error in polling (${error.code}): ${error.message || error.hostname || 'Connection issue'} (${consecutiveNetworkErrors} consecutive errors)`)
                 lastNetworkErrorLog = now
               }
-              // Продолжаем работу, попробуем снова через интервал
+              // Просто игнорируем ошибку, не пытаемся переподключаться
               return
             }
             
@@ -596,26 +605,35 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
         }
         reject(err)
       } else if ((err as any).code === 'ENOTFOUND' || (err as any).code === 'ETIMEDOUT' || (err as any).code === 'ECONNREFUSED') {
-        // Сетевые ошибки - не критичные, логируем с rate limiting
+        // Сетевые ошибки - при множественных ошибках останавливаемся (PM2 перезапустит)
         consecutiveNetworkErrors++
         const now = Date.now()
         
-        // Вычисляем задержку перед переподключением (экспоненциальная задержка)
-        let reconnectDelay = 10000 // 10 секунд по умолчанию
-        if (consecutiveNetworkErrors >= 100) {
-          reconnectDelay = 300000 // 5 минут при 100+ ошибках
-        } else if (consecutiveNetworkErrors >= 50) {
-          reconnectDelay = 120000 // 2 минуты при 50+ ошибках
-        } else if (consecutiveNetworkErrors >= 20) {
-          reconnectDelay = 60000 // 1 минута при 20+ ошибках
-        } else if (consecutiveNetworkErrors >= 10) {
-          reconnectDelay = 30000 // 30 секунд при 10+ ошибках
+        // При критических ошибках (10+) просто останавливаемся - PM2 перезапустит процесс
+        if (consecutiveNetworkErrors >= 10) {
+          console.error(`❌ Too many network errors (${consecutiveNetworkErrors}), stopping watcher. PM2 will restart the process.`)
+          // Закрываем все интервалы
+          try {
+            if (idleInterval) {
+              clearInterval(idleInterval)
+              idleInterval = null
+            }
+            if (keepAliveInterval) {
+              clearInterval(keepAliveInterval)
+              keepAliveInterval = null
+            }
+            imap.end()
+          } catch (e) {
+            // Игнорируем ошибки
+          }
+          // Просто выходим - PM2 перезапустит
+          process.exit(1)
         }
         
         // Логируем только если прошло достаточно времени и есть несколько ошибок подряд
         if (consecutiveNetworkErrors >= MAX_CONSECUTIVE_ERRORS_BEFORE_LOG && 
             (now - lastNetworkErrorLog) > NETWORK_ERROR_LOG_INTERVAL) {
-          console.warn(`⚠️ IMAP network error (${(err as any).code}): ${err.message || err} (${consecutiveNetworkErrors} consecutive errors, reconnecting in ${reconnectDelay/1000}s)`)
+          console.warn(`⚠️ IMAP network error (${(err as any).code}): ${err.message || err} (${consecutiveNetworkErrors} consecutive errors)`)
           lastNetworkErrorLog = now
         }
         
@@ -634,14 +652,8 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
           // Игнорируем ошибки при закрытии
         }
         
-        // Переподключаемся с задержкой (через resolve, чтобы основной цикл перезапустил)
-        setTimeout(() => {
-          if (consecutiveNetworkErrors % 10 === 0 || consecutiveNetworkErrors < 10) {
-            console.log(`🔄 Reconnecting after network error (attempt ${consecutiveNetworkErrors})...`)
-          }
-          resolve() // Разрешаем промис, чтобы основной цикл перезапустил подключение
-        }, reconnectDelay)
-        // Не reject, чтобы не прерывать цикл переподключения
+        // Не переподключаемся - просто разрешаем промис, основной цикл попробует снова
+        resolve()
       } else {
         console.error('❌ IMAP connection error:', err)
         consecutiveNetworkErrors = 0 // Сбрасываем при других ошибках
@@ -765,13 +777,19 @@ export async function startWatcher(): Promise<void> {
           console.error('   Waiting 60 seconds before retry...')
           await new Promise((resolve) => setTimeout(resolve, 60000))
         } else {
-          console.error('❌ IDLE mode error, reconnecting in 10 seconds...', error.message)
-          await new Promise((resolve) => setTimeout(resolve, 10000))
+          // При других ошибках просто логируем и продолжаем цикл без задержек
+          console.error('❌ IDLE mode error:', error.message)
+          // Не добавляем задержку - цикл сразу попробует заново
         }
       }
     } catch (error: any) {
+      // При критических DNS ошибках останавливаемся - PM2 перезапустит
+      if ((error as any).code === 'ENOTFOUND' && consecutiveNetworkErrors >= 10) {
+        console.error(`❌ Too many DNS errors (${consecutiveNetworkErrors}), stopping watcher. PM2 will restart.`)
+        process.exit(1)
+      }
       console.error('❌ Error in watcher:', error)
-      await new Promise((resolve) => setTimeout(resolve, 10000))
+      // Не добавляем задержку - цикл сразу попробует заново
     }
   }
 }
