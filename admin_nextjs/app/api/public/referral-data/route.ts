@@ -504,6 +504,12 @@ export async function GET(request: NextRequest) {
     const availableBalance = totalEarned - totalWithdrawn
     
     console.log(`💰 [Referral Data API] Earned (текущий месяц): ${earned}, Total Earned (все время): ${totalEarned}, Withdrawn (after first earning): ${totalWithdrawn}, Available: ${availableBalance}`)
+    console.log(`📋 [Referral Data API] Найдено выводов после первой earnings: ${completedWithdrawals.length}`)
+    if (completedWithdrawals.length > 0) {
+      completedWithdrawals.forEach((w, idx) => {
+        console.log(`   Вывод #${idx + 1}: ID=${w.id}, Amount=${w.amount}, CreatedAt=${w.createdAt.toISOString()}`)
+      })
+    }
     
     // Проверяем, есть ли pending заявки (для информации, но они не влияют на баланс)
     const pendingWithdrawals = await prisma.referralWithdrawalRequest.findMany({
