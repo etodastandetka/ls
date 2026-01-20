@@ -456,73 +456,48 @@ export async function GET(request: NextRequest) {
       prize: prizeDistribution[index] || 0
     }))
     
-    // Получаем первую запись о заработке (earnings), чтобы исключить выводы до появления earnings
-    const firstEarning = await prisma.botReferralEarning.findFirst({
+    // Получаем ВСЕ выводы со статусом 'completed' (без фильтрации по дате)
+    // Ограничиваем сумму выводов суммой earnings, чтобы не было отрицательного баланса
+    const allCompletedWithdrawals = await prisma.referralWithdrawalRequest.findMany({
       where: {
-        referrerId: userIdBigInt,
+        userId: userIdBigInt,
         status: 'completed'
       },
       orderBy: {
-        createdAt: 'asc'
+        createdAt: 'desc'
       },
       select: {
-        createdAt: true
+        id: true,
+        amount: true,
+        createdAt: true,
+        processedAt: true
       }
     })
     
-    // Получаем только те выводы, которые были ПОСЛЕ первой earnings (игнорируем старые)
-    // ВАЖНО: Учитываем все выводы со статусом 'completed'
-    // Используем processedAt или createdAt - берем более позднюю дату для проверки
-    let completedWithdrawals: Array<{ id: number, amount: any, createdAt: Date, processedAt: Date | null }> = []
-    if (firstEarning) {
-      // Если есть earnings, учитываем только выводы, которые были обработаны после первой earnings
-      // Используем processedAt если есть, иначе createdAt
-      const allCompleted = await prisma.referralWithdrawalRequest.findMany({
-        where: {
-          userId: userIdBigInt,
-          status: 'completed'
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        select: {
-          id: true,
-          amount: true,
-          createdAt: true,
-          processedAt: true
-        }
-      })
-      
-      // Фильтруем: учитываем только те, которые были обработаны/созданы после первой earnings
-      completedWithdrawals = allCompleted.filter(w => {
-        const checkDate = w.processedAt || w.createdAt
-        return checkDate >= firstEarning.createdAt
-      })
-      
-      console.log(`📅 [Referral Data API] Первая earnings: ${firstEarning.createdAt.toISOString()}`)
-      console.log(`📅 [Referral Data API] Всего completed выводов: ${allCompleted.length}, после первой earnings: ${completedWithdrawals.length}`)
-    } else {
-      // Если нет earnings вообще, не учитываем никакие выводы (старые не важны)
-      completedWithdrawals = []
-      console.log(`⚠️ [Referral Data API] Нет earnings, не учитываем выводы`)
-    }
-    
-    // Считаем выведенное (только после первой earnings)
-    const totalWithdrawn = completedWithdrawals.reduce((sum, w) => {
+    // Считаем сумму всех выводов
+    let totalWithdrawn = allCompletedWithdrawals.reduce((sum, w) => {
       return sum + (w.amount ? parseFloat(w.amount.toString()) : 0)
     }, 0)
     
-    // Доступный баланс = весь заработок за все время - выведенное (только после первой earnings)
-    // Старые выводы игнорируются
+    // Ограничиваем выведенное суммой заработанного (защита от отрицательного баланса)
+    // Если были старые выводы до появления earnings, они не будут учитываться
+    if (totalWithdrawn > totalEarned) {
+      console.log(`⚠️ [Referral Data API] Выведено (${totalWithdrawn}) больше чем заработано (${totalEarned}). Ограничиваем выведенное до заработанного.`)
+      totalWithdrawn = totalEarned
+    }
+    
+    console.log(`📋 [Referral Data API] Всего completed выводов: ${allCompletedWithdrawals.length}, сумма: ${totalWithdrawn.toFixed(2)}`)
+    
+    // Доступный баланс = весь заработок за все время - выведенное
     // earned - это только текущий месяц (для отображения), а для баланса используем totalEarned
     const availableBalance = totalEarned - totalWithdrawn
     
-    console.log(`💰 [Referral Data API] Earned (текущий месяц): ${earned}, Total Earned (все время): ${totalEarned}, Withdrawn (after first earning): ${totalWithdrawn}, Available: ${availableBalance}`)
-    console.log(`📋 [Referral Data API] Найдено выводов после первой earnings: ${completedWithdrawals.length}`)
-    if (completedWithdrawals.length > 0) {
-      completedWithdrawals.forEach((w, idx) => {
-        const checkDate = w.processedAt || w.createdAt
-        console.log(`   Вывод #${idx + 1}: ID=${w.id}, Amount=${w.amount}, CreatedAt=${w.createdAt.toISOString()}, ProcessedAt=${w.processedAt?.toISOString() || 'null'}, CheckDate=${checkDate.toISOString()}`)
+    console.log(`💰 [Referral Data API] Earned (текущий месяц): ${earned}, Total Earned (все время): ${totalEarned}, Withdrawn: ${totalWithdrawn.toFixed(2)}, Available: ${availableBalance.toFixed(2)}`)
+    console.log(`📋 [Referral Data API] Всего completed выводов: ${allCompletedWithdrawals.length}`)
+    if (allCompletedWithdrawals.length > 0) {
+      allCompletedWithdrawals.forEach((w, idx) => {
+        const amount = w.amount ? parseFloat(w.amount.toString()) : 0
+        console.log(`   Вывод #${idx + 1}: ID=${w.id}, Amount=${amount.toFixed(2)}, CreatedAt=${w.createdAt.toISOString()}, ProcessedAt=${w.processedAt?.toISOString() || 'null'}`)
       })
     }
     
