@@ -663,15 +663,6 @@ export default function ReferralPage() {
         </section>
       )}
 
-      {/* Отладочная информация (временно для диагностики) */}
-      <section className="card bg-gray-800/50 border border-gray-600 text-xs text-white/60 p-3 mb-4">
-        <div className="font-semibold mb-2">🔍 Отладка:</div>
-        <div>availableBalance = {availableBalance.toFixed(2)}</div>
-        <div>earned = {earned.toFixed(2)}</div>
-        <div>hasPendingWithdrawal = {hasPendingWithdrawal ? 'true' : 'false'}</div>
-        <div>Показывать кнопку? {availableBalance >= 100 ? '✅ ДА' : '❌ НЕТ'}</div>
-      </section>
-
       {/* Кнопка вывода - показывается если доступный баланс >= 100 сом */}
       {availableBalance >= 100 ? (
         <section className="card text-center space-y-3 border-green-500/20">
