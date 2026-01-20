@@ -640,14 +640,14 @@ export default function ReferralPage() {
         </div>
       </div>
 
-      {/* Кнопка вывода - показывается если баланс >= 100 сом */}
+      {/* Кнопка вывода - показывается если доступный баланс >= 100 сом */}
       {availableBalance >= 100 ? (
-        <section className="card text-center space-y-3">
+        <section className="card text-center space-y-3 border-green-500/20">
           <div className="text-lg font-semibold text-white">Доступно для вывода</div>
           <div className="text-3xl font-bold text-green-400">{availableBalance.toLocaleString()} сом</div>
           <button
             onClick={() => router.push('/referral/withdraw/step1')}
-            className="w-full bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+            className="w-full bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-lg shadow-green-500/30"
           >
             Вывести средства
           </button>
@@ -655,7 +655,7 @@ export default function ReferralPage() {
             Вывод выполняется автоматически • Минимальная сумма: 100 сом
           </p>
         </section>
-      ) : availableBalance > 0 ? (
+      ) : availableBalance > 0 && availableBalance < 100 ? (
         <section className="card bg-yellow-500/20 border border-yellow-500/30 text-center space-y-2">
           <div className="text-yellow-400 font-semibold">Недостаточно для вывода</div>
           <div className="text-sm text-white/80">
