@@ -9,7 +9,16 @@ export interface ApiResponse<T = any> {
 }
 
 export function getAuthUser(request: NextRequest): TokenPayload | null {
-  const token = request.cookies.get('auth_token')?.value
+  // Сначала проверяем заголовок Authorization (Bearer токен)
+  const authHeader = request.headers.get('authorization')
+  let token: string | null = null
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7) // Убираем "Bearer "
+  } else {
+    // Если нет в заголовке, проверяем cookie
+    token = request.cookies.get('auth_token')?.value || null
+  }
 
   if (!token) {
     return null
