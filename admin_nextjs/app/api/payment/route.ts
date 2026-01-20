@@ -714,21 +714,33 @@ export async function POST(request: NextRequest) {
       // Ищем необработанные входящие платежи с точным совпадением суммы
       // Делаем это СИНХРОННО (await) чтобы автопополнение сработало мгновенно
       try {
-      // Ищем входящие платежи только за последние N минут (из конфигурации)
+      // Ищем входящие платежи в окне ±5 минут от времени создания заявки
       // Это защищает от случайного пополнения если пользователь не пополнял
+      // И работает даже если платеж пришел ДО создания заявки
+      const requestCreatedAt = newRequest.createdAt
+      const searchWindowMs = AUTO_DEPOSIT_CONFIG.REQUEST_SEARCH_WINDOW_MS
+      const searchWindowStart = new Date(requestCreatedAt.getTime() - searchWindowMs) // 5 минут ДО создания заявки
+      const searchWindowEnd = new Date(requestCreatedAt.getTime() + searchWindowMs) // 5 минут ПОСЛЕ создания заявки
+      
+      console.log(`🔍 [Auto-Deposit] Searching payments in window: ${searchWindowStart.toISOString()} to ${searchWindowEnd.toISOString()} for request ${newRequest.id}`)
+      
       const incomingPayments = await prisma.incomingPayment.findMany({
         where: {
           isProcessed: false,
           amount: requestAmount,
           OR: [
             {
+              // Платежи где paymentDate попадает в окно
               paymentDate: {
-                gte: new Date(Date.now() - AUTO_DEPOSIT_CONFIG.REQUEST_SEARCH_WINDOW_MS)
+                gte: searchWindowStart,
+                lte: searchWindowEnd
               }
             },
             {
+              // Или платежи где createdAt попадает в окно (если paymentDate не точный)
               createdAt: {
-                gte: new Date(Date.now() - AUTO_DEPOSIT_CONFIG.REQUEST_SEARCH_WINDOW_MS)
+                gte: searchWindowStart,
+                lte: searchWindowEnd
               }
             }
           ]
@@ -741,7 +753,12 @@ export async function POST(request: NextRequest) {
 
         if (incomingPayments.length > 0) {
           const payment = incomingPayments[0]
-          console.log(`✅ [Auto-Deposit] Found matching payment ${payment.id} for NEW request ${newRequest.id}, processing INSTANTLY...`)
+          const timeDiff = requestCreatedAt.getTime() - payment.paymentDate.getTime()
+          const minutesDiff = Math.floor(Math.abs(timeDiff) / 60000)
+          const paymentDirection = timeDiff > 0 ? 'BEFORE' : 'AFTER'
+          console.log(`✅ [Auto-Deposit] Found matching payment ${payment.id} for NEW request ${newRequest.id}`)
+          console.log(`   Payment ${paymentDirection} request by ${minutesDiff} minutes, processing INSTANTLY...`)
+          console.log(`   Payment date: ${payment.paymentDate.toISOString()}, Request created: ${requestCreatedAt.toISOString()}`)
           
           // Импортируем функцию автопополнения из отдельного модуля
           const { matchAndProcessPayment } = await import('../../../lib/auto-deposit')
