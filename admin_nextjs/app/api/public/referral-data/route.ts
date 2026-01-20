@@ -280,7 +280,7 @@ export async function GET(request: NextRequest) {
     console.log('📅 [Referral Data API] Фильтрация данных с даты:', monthStartDate.toISOString())
     
     // ОПТИМИЗИРОВАННЫЕ ЗАПРОСЫ: Используем параллельные запросы и агрегацию
-    const [referrals, earnings, stats] = await Promise.all([
+    const [referrals, earningsCurrentMonth, earningsAll, stats] = await Promise.all([
       // Получаем только количество рефералов (без include для скорости)
       prisma.botReferral.count({
         where: {
@@ -495,11 +495,12 @@ export async function GET(request: NextRequest) {
       return sum + (w.amount ? parseFloat(w.amount.toString()) : 0)
     }, 0)
     
-    // Доступный баланс = заработанное - выведенное (только после первой earnings)
+    // Доступный баланс = весь заработок за все время - выведенное (только после первой earnings)
     // Старые выводы игнорируются
-    const availableBalance = earned - totalWithdrawn
+    // earned - это только текущий месяц (для отображения), а для баланса используем totalEarned
+    const availableBalance = totalEarned - totalWithdrawn
     
-    console.log(`💰 [Referral Data API] Earned: ${earned}, Withdrawn (after first earning): ${totalWithdrawn}, Available: ${availableBalance}`)
+    console.log(`💰 [Referral Data API] Earned (текущий месяц): ${earned}, Total Earned (все время): ${totalEarned}, Withdrawn (after first earning): ${totalWithdrawn}, Available: ${availableBalance}`)
     
     // Проверяем, есть ли pending заявки (для информации, но они не влияют на баланс)
     const pendingWithdrawals = await prisma.referralWithdrawalRequest.findMany({
