@@ -719,6 +719,10 @@ let isFirstRun = true
 export async function startWatcher(): Promise<void> {
   console.log('🚀 Starting Email Watcher (IDLE mode - real-time)...')
 
+  // Небольшая задержка при старте для инициализации DNS и системы
+  console.log('⏳ Initializing... (waiting 2 seconds)')
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+
   // Запускаем периодическую проверку таймаутов каждую минуту
   const timeoutInterval = setInterval(() => {
     checkTimeouts().catch((error) => {
@@ -786,8 +790,10 @@ export async function startWatcher(): Promise<void> {
             console.error(`❌ Too many network errors (${consecutiveNetworkErrors}), stopping watcher. PM2 will restart.`)
             process.exit(1)
           }
-          // При не критических ошибках просто логируем и продолжаем цикл
+          // При не критических ошибках логируем и добавляем небольшую задержку перед следующей попыткой
           console.error('❌ Network error in IDLE mode:', error.message)
+          // Небольшая задержка 5 секунд перед следующей попыткой подключения
+          await new Promise((resolve) => setTimeout(resolve, 5000))
         } else {
           // При других ошибках просто логируем и продолжаем цикл
           console.error('❌ IDLE mode error:', error.message)
