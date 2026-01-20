@@ -660,7 +660,6 @@ export default function ReferralPage() {
         <section className="card bg-blue-500/10 border border-blue-500/20 text-center space-y-1 py-2">
           <div className="text-xs text-white/60">{t.monthlyEarned}</div>
           <div className="text-lg font-semibold text-blue-300">{earned.toLocaleString()} сом</div>
-          <div className="text-xs text-white/50">Для участия в рейтинге</div>
         </section>
       )}
 
