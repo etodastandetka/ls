@@ -5,11 +5,11 @@
   "scripts": {
     "dev": "next dev -p 3002",
     "dev:3001": "next dev -p 3001",
-    "build": "npm run prisma:generate && cp -r ../admin_nextjs/node_modules/.prisma node_modules/.prisma 2>/dev/null || true && next build",
+    "build": "npm run prisma:generate && (cp -r ../admin_nextjs/node_modules/.prisma node_modules/ 2>/dev/null || cp -r ../admin_nextjs/node_modules/@prisma/client node_modules/@prisma/client 2>/dev/null || true) && next build",
     "start": "next start",
     "start:prod": "NODE_ENV=production next start -p 3030",
     "postinstall": "npm run prisma:generate || true",
-    "prisma:generate": "prisma generate --schema=../admin_nextjs/prisma/schema.prisma && cp -r ../admin_nextjs/node_modules/.prisma node_modules/.prisma 2>/dev/null || true"
+    "prisma:generate": "prisma generate --schema=../admin_nextjs/prisma/schema.prisma && (cp -r ../admin_nextjs/node_modules/.prisma node_modules/ 2>/dev/null || cp -r ../admin_nextjs/node_modules/@prisma/client node_modules/@prisma/client 2>/dev/null || true)"
   },
   "prisma": {
     "schema": "../admin_nextjs/prisma/schema.prisma"
