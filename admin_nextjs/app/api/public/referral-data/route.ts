@@ -287,12 +287,24 @@ export async function GET(request: NextRequest) {
           referrerId: userIdBigInt
         }
       }),
-      // Получаем ВСЕ заработанные комиссии (не только за текущий месяц, чтобы видеть полный баланс)
+      // Получаем заработанные комиссии за текущий месяц (для отображения earned)
+      prisma.botReferralEarning.aggregate({
+        where: {
+          referrerId: userIdBigInt,
+          status: 'completed',
+          createdAt: {
+            gte: monthStartDate
+          }
+        },
+        _sum: {
+          commissionAmount: true
+        }
+      }),
+      // Получаем ВСЕ заработанные комиссии (для расчета доступного баланса - накопленные за все время)
       prisma.botReferralEarning.aggregate({
         where: {
           referrerId: userIdBigInt,
           status: 'completed'
-          // Убрали фильтр по месяцу - учитываем все earnings
         },
         _sum: {
           commissionAmount: true
