@@ -574,6 +574,19 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
               return
             }
             
+            // Обрабатываем ошибку "Account is temporarily unavailable" - это значит сервер временно заблокировал аккаунт
+            // Обычно происходит при слишком частых подключениях
+            if (error.message && error.message.includes('Account is temporarily unavailable')) {
+              // Логируем только раз в 5 минут, чтобы не спамить
+              const now = Date.now()
+              if ((now - lastNetworkErrorLog) > NETWORK_ERROR_LOG_INTERVAL) {
+                console.warn(`⚠️ Account temporarily unavailable - IMAP server blocked due to frequent connections. Waiting...`)
+                lastNetworkErrorLog = now
+              }
+              // Не сбрасываем счетчик, но и не увеличиваем - просто игнорируем и ждем
+              return
+            }
+            
             // Сбрасываем счетчик при других ошибках
             consecutiveNetworkErrors = 0
             console.error('Error in quick polling:', error.message || error)

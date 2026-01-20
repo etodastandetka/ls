@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { AUTO_DEPOSIT_CONFIG } from '@/config/app'
+import { processReferralEarning } from './referral-earnings'
 
 /**
  * ЕДИНСТВЕННАЯ функция автопополнения - работает только здесь
@@ -494,6 +495,19 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     const statusOk = finalCheck?.status === 'autodeposit_success'
     const paymentOk = finalPaymentCheck?.requestId === request.id && finalPaymentCheck?.isProcessed === true
     
+    // Начисляем реферальные бонусы (2% от депозита) если депозит успешно обработан
+    if (statusOk && !updateResult?.skipped && request.userId && request.amount) {
+      processReferralEarning(
+        request.userId,
+        requestAmount,
+        request.bookmaker || null,
+        request.id
+      ).catch(error => {
+        console.error(`❌ [Auto-Deposit] Failed to process referral earning:`, error)
+        // Не блокируем выполнение, если начисление бонусов не удалось
+      })
+    }
+
     // Отправляем уведомление пользователю в бот, если заявка создана через бот
     // ВАЖНО: Отправляем только если статус действительно обновился на autodeposit_success
     // Это предотвращает дублирование уведомлений

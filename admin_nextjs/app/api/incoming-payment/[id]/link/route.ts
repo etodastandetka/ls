@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
+import { processReferralEarning } from '@/lib/referral-earnings'
 
 // Функция для отправки уведомления пользователю в Telegram
 async function sendTelegramNotification(userId: bigint, message: string) {
@@ -127,10 +128,34 @@ export async function POST(
               parseInt(requestId) // Передаем requestId чтобы исключить текущую заявку из проверки на дублирование
             )
             console.log(`✅ Auto-deposit successful after linking payment: Request ${requestId}, Account ${linkedRequest.accountId}`)
+            
+            // Начисляем реферальные бонусы (2% от депозита)
+            if (linkedRequest.userId && linkedRequest.amount) {
+              processReferralEarning(
+                linkedRequest.userId,
+                requestAmount,
+                linkedRequest.bookmaker,
+                parseInt(requestId)
+              ).catch(error => {
+                console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
+                // Не блокируем выполнение, если начисление бонусов не удалось
+              })
+            }
           } catch (error: any) {
             console.error(`❌ Auto-deposit failed after linking payment:`, error)
             // Не возвращаем ошибку, т.к. платеж уже привязан
           }
+        } else if (linkedRequest.requestType === 'deposit' && linkedRequest.userId && linkedRequest.amount) {
+          // Если это депозит, но нет accountId/bookmaker, все равно начисляем реферальные бонусы
+          processReferralEarning(
+            linkedRequest.userId,
+            requestAmount,
+            linkedRequest.bookmaker,
+            parseInt(requestId)
+          ).catch(error => {
+            console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
+            // Не блокируем выполнение, если начисление бонусов не удалось
+          })
         }
       }
     }

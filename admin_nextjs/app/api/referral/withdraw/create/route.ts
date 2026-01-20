@@ -49,6 +49,17 @@ export async function POST(request: NextRequest) {
       return errorResponse
     }
     
+    // Минимальная сумма вывода - 100 сом
+    const minWithdrawalAmount = 100
+    if (amount < minWithdrawalAmount) {
+      const errorResponse = NextResponse.json({
+        success: false,
+        error: `Минимальная сумма вывода: ${minWithdrawalAmount} сом`
+      }, { status: 400 })
+      errorResponse.headers.set('Access-Control-Allow-Origin', '*')
+      return errorResponse
+    }
+    
     // Проверяем, есть ли у пользователя достаточно средств для вывода
     const earnings = await prisma.botReferralEarning.findMany({
       where: {
@@ -80,21 +91,20 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Referral Withdraw Create] User ${userId}: Earned=${totalEarned.toFixed(2)}, Withdrawn=${totalWithdrawn.toFixed(2)}, Available=${availableBalance.toFixed(2)}`)
     
-    // ВАЖНО: Можно вывести только весь баланс сразу
-    const tolerance = 0.01 // Допустимая погрешность для округления
-    if (Math.abs(amount - availableBalance) > tolerance) {
+    if (availableBalance <= 0) {
       const errorResponse = NextResponse.json({
         success: false,
-        error: `Можно вывести только весь баланс: ${availableBalance.toFixed(2)} сом`
+        error: 'Нет доступных средств для вывода'
       }, { status: 400 })
       errorResponse.headers.set('Access-Control-Allow-Origin', '*')
       return errorResponse
     }
     
-    if (availableBalance <= 0) {
+    // Проверяем, что запрашиваемая сумма не превышает доступный баланс
+    if (amount > availableBalance) {
       const errorResponse = NextResponse.json({
         success: false,
-        error: 'Нет доступных средств для вывода'
+        error: `Недостаточно средств. Доступно: ${availableBalance.toFixed(2)} сом`
       }, { status: 400 })
       errorResponse.headers.set('Access-Control-Allow-Origin', '*')
       return errorResponse

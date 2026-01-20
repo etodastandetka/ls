@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
         success: true,
         top_players: topReferrers,
         settings: {
-          referral_percentage: 5,
+          referral_percentage: 2,
           min_payout: 100,
           first_place_prize: prizeDistribution[0],
           second_place_prize: prizeDistribution[1],
@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
           success: true,
           top_players: [],
           settings: {
-            referral_percentage: 5,
+            referral_percentage: 2,
             min_payout: 100,
             first_place_prize: 10000,
             second_place_prize: 5000,
@@ -494,7 +494,7 @@ export async function GET(request: NextRequest) {
     ]
     const nextPayoutDateFormatted = `${nextPayoutDate.getDate()} ${monthNames[nextPayoutDate.getMonth()]}`
     
-    // Получаем список рефералов пользователя для сравнения
+    // Получаем список рефералов пользователя с информацией о заработке
     const userReferrals = await prisma.botReferral.findMany({
       where: {
         referrerId: userIdBigInt
@@ -509,24 +509,70 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      take: 10, // Берем топ-10 рефералов
+      take: 50, // Берем до 50 рефералов
       orderBy: {
         createdAt: 'desc'
       }
     })
     
-    const referralsList = userReferrals.map(ref => ({
-      referred_id: ref.referredId.toString(),
-      referred_username: ref.referred?.username || null,
-      referred_firstName: ref.referred?.firstName || null,
-      referred_lastName: ref.referred?.lastName || null,
-      displayName: ref.referred?.username 
-        ? `@${ref.referred.username}` 
-        : ref.referred?.firstName 
-          ? `${ref.referred.firstName}${ref.referred.lastName ? ' ' + ref.referred.lastName : ''}`
-          : `Игрок #${ref.referredId}`,
-      createdAt: ref.createdAt.toISOString()
-    }))
+    // Для каждого реферала получаем статистику депозитов и заработка
+    const referralsList = await Promise.all(
+      userReferrals.map(async (ref) => {
+        // Получаем общую сумму депозитов реферала
+        const depositsStats = await prisma.request.aggregate({
+          where: {
+            userId: ref.referredId,
+            requestType: 'deposit',
+            status: {
+              in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
+            }
+          },
+          _sum: {
+            amount: true
+          },
+          _count: {
+            id: true
+          }
+        })
+        
+        // Получаем общий заработок от этого реферала
+        const earningsStats = await prisma.botReferralEarning.aggregate({
+          where: {
+            referrerId: userIdBigInt,
+            referredId: ref.referredId,
+            status: 'completed'
+          },
+          _sum: {
+            commissionAmount: true
+          },
+          _count: {
+            id: true
+          }
+        })
+        
+        const totalDeposits = depositsStats._sum.amount ? parseFloat(depositsStats._sum.amount.toString()) : 0
+        const totalEarnings = earningsStats._sum.commissionAmount ? parseFloat(earningsStats._sum.commissionAmount.toString()) : 0
+        const depositsCount = depositsStats._count.id || 0
+        const earningsCount = earningsStats._count.id || 0
+        
+        return {
+          referred_id: ref.referredId.toString(),
+          referred_username: ref.referred?.username || null,
+          referred_firstName: ref.referred?.firstName || null,
+          referred_lastName: ref.referred?.lastName || null,
+          displayName: ref.referred?.username 
+            ? `@${ref.referred.username}` 
+            : ref.referred?.firstName 
+              ? `${ref.referred.firstName}${ref.referred.lastName ? ' ' + ref.referred.lastName : ''}`
+              : `Игрок #${ref.referredId}`,
+          createdAt: ref.createdAt.toISOString(),
+          total_deposits: totalDeposits,
+          total_earnings: totalEarnings,
+          deposits_count: depositsCount,
+          earnings_count: earningsCount
+        }
+      })
+    )
     
     const responseData = {
       success: true,
@@ -546,7 +592,7 @@ export async function GET(request: NextRequest) {
         ? topReferrersWithPrizes[4].total_deposits 
         : 0,
       settings: {
-        referral_percentage: 5,
+        referral_percentage: 2,
         min_payout: 100,
         first_place_prize: prizeDistribution[0],
         second_place_prize: prizeDistribution[1],

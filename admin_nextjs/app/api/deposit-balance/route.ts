@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
 import { depositToCasino } from '@/lib/deposit-balance'
+import { processReferralEarning } from '@/lib/referral-earnings'
 
 // Функция для отправки уведомления пользователю в Telegram
 async function sendTelegramNotification(userId: bigint, message: string) {
@@ -125,6 +126,19 @@ export async function POST(request: NextRequest) {
         processedBy: authUser.username as any,
       },
     })
+
+    // Начисляем реферальные бонусы (2% от депозита)
+    if (requestData.userId && requestData.amount) {
+      processReferralEarning(
+        requestData.userId,
+        parseFloat(requestData.amount.toString()),
+        requestData.bookmaker,
+        parseInt(requestId)
+      ).catch(error => {
+        console.error(`❌ [Deposit Balance] Failed to process referral earning:`, error)
+        // Не блокируем ответ, если начисление бонусов не удалось
+      })
+    }
 
     // Отправляем уведомление пользователю в бот, если заявка создана через бот
     const source = (requestData as any).source
