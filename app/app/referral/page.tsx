@@ -391,9 +391,20 @@ export default function ReferralPage() {
       }
     }, 30000) // 30 секунд
     
+    // Обновляем данные при фокусе страницы (когда пользователь возвращается)
+    const handleFocus = () => {
+      if (mounted) {
+        console.log('🔄 Страница получила фокус, обновляю данные...')
+        loadData()
+      }
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    
     return () => {
       mounted = false
       clearInterval(intervalId)
+      window.removeEventListener('focus', handleFocus)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
