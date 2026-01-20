@@ -471,7 +471,8 @@ export async function GET(request: NextRequest) {
     })
     
     // Получаем только те выводы, которые были ПОСЛЕ первой earnings (игнорируем старые)
-    let completedWithdrawals = []
+    // ВАЖНО: Учитываем все выводы со статусом 'completed', которые были созданы после первой earnings
+    let completedWithdrawals: Array<{ id: number, amount: any, createdAt: Date }> = []
     if (firstEarning) {
       // Если есть earnings, учитываем только выводы после них
       completedWithdrawals = await prisma.referralWithdrawalRequest.findMany({
@@ -484,6 +485,11 @@ export async function GET(request: NextRequest) {
         },
         orderBy: {
           createdAt: 'desc'
+        },
+        select: {
+          id: true,
+          amount: true,
+          createdAt: true
         }
       })
       console.log(`📅 [Referral Data API] Первая earnings: ${firstEarning.createdAt.toISOString()}, учитываем только выводы после этой даты`)
