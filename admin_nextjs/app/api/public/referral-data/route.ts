@@ -471,17 +471,16 @@ export async function GET(request: NextRequest) {
     })
     
     // Получаем только те выводы, которые были ПОСЛЕ первой earnings (игнорируем старые)
-    // ВАЖНО: Учитываем все выводы со статусом 'completed', которые были созданы после первой earnings
-    let completedWithdrawals: Array<{ id: number, amount: any, createdAt: Date }> = []
+    // ВАЖНО: Учитываем все выводы со статусом 'completed'
+    // Используем processedAt или createdAt - берем более позднюю дату для проверки
+    let completedWithdrawals: Array<{ id: number, amount: any, createdAt: Date, processedAt: Date | null }> = []
     if (firstEarning) {
-      // Если есть earnings, учитываем только выводы после них
-      completedWithdrawals = await prisma.referralWithdrawalRequest.findMany({
+      // Если есть earnings, учитываем только выводы, которые были обработаны после первой earnings
+      // Используем processedAt если есть, иначе createdAt
+      const allCompleted = await prisma.referralWithdrawalRequest.findMany({
         where: {
           userId: userIdBigInt,
-          status: 'completed',
-          createdAt: {
-            gte: firstEarning.createdAt // Только выводы после первой earnings
-          }
+          status: 'completed'
         },
         orderBy: {
           createdAt: 'desc'
@@ -489,10 +488,19 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           amount: true,
-          createdAt: true
+          createdAt: true,
+          processedAt: true
         }
       })
-      console.log(`📅 [Referral Data API] Первая earnings: ${firstEarning.createdAt.toISOString()}, учитываем только выводы после этой даты`)
+      
+      // Фильтруем: учитываем только те, которые были обработаны/созданы после первой earnings
+      completedWithdrawals = allCompleted.filter(w => {
+        const checkDate = w.processedAt || w.createdAt
+        return checkDate >= firstEarning.createdAt
+      })
+      
+      console.log(`📅 [Referral Data API] Первая earnings: ${firstEarning.createdAt.toISOString()}`)
+      console.log(`📅 [Referral Data API] Всего completed выводов: ${allCompleted.length}, после первой earnings: ${completedWithdrawals.length}`)
     } else {
       // Если нет earnings вообще, не учитываем никакие выводы (старые не важны)
       completedWithdrawals = []
@@ -513,7 +521,8 @@ export async function GET(request: NextRequest) {
     console.log(`📋 [Referral Data API] Найдено выводов после первой earnings: ${completedWithdrawals.length}`)
     if (completedWithdrawals.length > 0) {
       completedWithdrawals.forEach((w, idx) => {
-        console.log(`   Вывод #${idx + 1}: ID=${w.id}, Amount=${w.amount}, CreatedAt=${w.createdAt.toISOString()}`)
+        const checkDate = w.processedAt || w.createdAt
+        console.log(`   Вывод #${idx + 1}: ID=${w.id}, Amount=${w.amount}, CreatedAt=${w.createdAt.toISOString()}, ProcessedAt=${w.processedAt?.toISOString() || 'null'}, CheckDate=${checkDate.toISOString()}`)
       })
     }
     
