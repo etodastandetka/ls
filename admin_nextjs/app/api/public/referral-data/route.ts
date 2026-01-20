@@ -329,7 +329,10 @@ export async function GET(request: NextRequest) {
     ])
     
     const referralCount = referrals
-    const earned = earnings._sum.commissionAmount ? parseFloat(earnings._sum.commissionAmount.toString()) : 0
+    // earned - заработок за текущий месяц (для отображения)
+    const earned = earningsCurrentMonth._sum.commissionAmount ? parseFloat(earningsCurrentMonth._sum.commissionAmount.toString()) : 0
+    // totalEarned - весь заработок за все время (для расчета доступного баланса)
+    const totalEarned = earningsAll._sum.commissionAmount ? parseFloat(earningsAll._sum.commissionAmount.toString()) : 0
     const activeReferralCount = stats.length > 0 ? parseInt(stats[0].active_referrals.toString()) : 0
     const totalDeposits = stats.length > 0 ? parseFloat(stats[0].total_deposits.toString()) : 0
     
