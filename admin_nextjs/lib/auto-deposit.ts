@@ -506,6 +506,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
             source: true,
             amount: true,
             bookmaker: true,
+            createdAt: true,
           },
         })
         
@@ -514,29 +515,39 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           const isFromBot = source === 'bot' || !source
           
           if (isFromBot && fullRequest.userId) {
-            const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
-              `💰 Сумма: ${fullRequest.amount} сом\n` +
-              `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
-              `⏱ Закрыта за: 1с`
+            // Вычисляем время с момента создания заявки
+            const timeSinceCreation = Date.now() - new Date(fullRequest.createdAt).getTime()
             
-            // Отправляем уведомление напрямую через Telegram API
-            const botToken = process.env.BOT_TOKEN
-            if (botToken) {
-              const sendMessageUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
-              fetch(sendMessageUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: fullRequest.userId.toString(),
-                  text: notificationMessage,
-                  parse_mode: 'HTML',
-                }),
-              }).then(() => {
-                console.log(`✅ [Auto-Deposit] Notification sent successfully for request ${request.id}`)
-              }).catch((error: any) => {
-                console.error(`❌ [Auto-Deposit] Failed to send notification for request ${request.id}:`, error)
-              })
-            }
+            // Если заявка только что создана (меньше 2 секунд), добавляем задержку
+            // чтобы уведомление "Заявка отправлена!" успело отправиться первым
+            const delay = timeSinceCreation < 2000 ? 1500 : 500 // 1.5 сек если новая заявка, иначе 0.5 сек
+            
+            // Отправляем уведомление с задержкой, чтобы оно пришло после "Заявка отправлена!"
+            setTimeout(async () => {
+              const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
+                `💰 Сумма: ${fullRequest.amount} сом\n` +
+                `🎰 Казино: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
+                `⏱ Закрыта за: 1с`
+              
+              // Отправляем уведомление напрямую через Telegram API
+              const botToken = process.env.BOT_TOKEN
+              if (botToken) {
+                const sendMessageUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
+                fetch(sendMessageUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: fullRequest.userId.toString(),
+                    text: notificationMessage,
+                    parse_mode: 'HTML',
+                  }),
+                }).then(() => {
+                  console.log(`✅ [Auto-Deposit] Notification sent successfully for request ${request.id}`)
+                }).catch((error: any) => {
+                  console.error(`❌ [Auto-Deposit] Failed to send notification for request ${request.id}:`, error)
+                })
+              }
+            }, delay)
           }
         }
       } catch (notificationError: any) {
