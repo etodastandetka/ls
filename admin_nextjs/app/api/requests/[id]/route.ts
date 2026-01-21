@@ -300,6 +300,14 @@ export async function PATCH(
     if (body.photoFileUrl !== undefined) {
       updateData.photoFileUrl = body.photoFileUrl
     }
+    // Обновление ID казино
+    if (body.accountId !== undefined) {
+      updateData.accountId = body.accountId
+    }
+    // Обновление казино
+    if (body.bookmaker !== undefined) {
+      updateData.bookmaker = body.bookmaker
+    }
 
     // Получаем заявку до обновления для отправки уведомления
     const requestBeforeUpdate = await prisma.request.findUnique({
