@@ -23,12 +23,12 @@ export default function ReferralPage() {
   const [referralSettings, setReferralSettings] = useState({
     referral_percentage: 5,
     min_payout: 100,
-    first_place_prize: 10000,
-    second_place_prize: 5000,
-    third_place_prize: 2500,
-    fourth_place_prize: 1500,
+    first_place_prize: 20000,
+    second_place_prize: 10000,
+    third_place_prize: 5000,
+    fourth_place_prize: 1000,
     fifth_place_prize: 1000,
-    total_prize_pool: 20000,
+    total_prize_pool: 52000,
     next_payout_date: '1 ноября'
   })
   const { language, setLanguage } = useLanguage()
@@ -125,12 +125,12 @@ export default function ReferralPage() {
               setReferralSettings({
                 referral_percentage: data.settings.referral_percentage || 5,
                 min_payout: data.settings.min_payout || 100,
-                first_place_prize: data.settings.first_place_prize || 10000,
-                second_place_prize: data.settings.second_place_prize || 5000,
-                third_place_prize: data.settings.third_place_prize || 2500,
-                fourth_place_prize: data.settings.fourth_place_prize || 1500,
+                first_place_prize: data.settings.first_place_prize || 20000,
+                second_place_prize: data.settings.second_place_prize || 10000,
+                third_place_prize: data.settings.third_place_prize || 5000,
+                fourth_place_prize: data.settings.fourth_place_prize || 1000,
                 fifth_place_prize: data.settings.fifth_place_prize || 1000,
-                total_prize_pool: data.settings.total_prize_pool || 20000,
+                total_prize_pool: data.settings.total_prize_pool || 52000,
                 next_payout_date: data.settings.next_payout_date || '1 ноября'
               })
             }
@@ -197,12 +197,12 @@ export default function ReferralPage() {
             setReferralSettings({
               referral_percentage: data.settings.referral_percentage || 5,
               min_payout: data.settings.min_payout || 100,
-              first_place_prize: data.settings.first_place_prize || 10000,
-              second_place_prize: data.settings.second_place_prize || 5000,
-              third_place_prize: data.settings.third_place_prize || 2500,
-              fourth_place_prize: data.settings.fourth_place_prize || 1500,
+              first_place_prize: data.settings.first_place_prize || 20000,
+              second_place_prize: data.settings.second_place_prize || 10000,
+              third_place_prize: data.settings.third_place_prize || 5000,
+              fourth_place_prize: data.settings.fourth_place_prize || 1000,
               fifth_place_prize: data.settings.fifth_place_prize || 1000,
-              total_prize_pool: data.settings.total_prize_pool || 20000,
+              total_prize_pool: data.settings.total_prize_pool || 52000,
               next_payout_date: data.settings.next_payout_date || '1 ноября'
             })
           } else {
@@ -247,12 +247,12 @@ export default function ReferralPage() {
               setReferralSettings({
                 referral_percentage: data.settings.referral_percentage || 5,
                 min_payout: data.settings.min_payout || 100,
-                first_place_prize: data.settings.first_place_prize || 10000,
-                second_place_prize: data.settings.second_place_prize || 5000,
-                third_place_prize: data.settings.third_place_prize || 2500,
-                fourth_place_prize: data.settings.fourth_place_prize || 1500,
+                first_place_prize: data.settings.first_place_prize || 20000,
+                second_place_prize: data.settings.second_place_prize || 10000,
+                third_place_prize: data.settings.third_place_prize || 5000,
+                fourth_place_prize: data.settings.fourth_place_prize || 1000,
                 fifth_place_prize: data.settings.fifth_place_prize || 1000,
-                total_prize_pool: data.settings.total_prize_pool || 20000,
+                total_prize_pool: data.settings.total_prize_pool || 52000,
                 next_payout_date: data.settings.next_payout_date || '1 ноября'
               })
             }
@@ -434,7 +434,7 @@ export default function ReferralPage() {
         'Поделитесь ссылкой с друзьями',
         'Чем больше ваши рефералы пополняют, тем выше ваш рейтинг',
         'Топ игроки по сумме пополнений рефералов получают призы',
-        'Призы распределяются по местам (1-5 место) в конце месяца'
+        'Призы распределяются по местам (топ-20) в конце месяца'
       ],
       shareText: 'Присоединяйся к VIP платформе пополнений и выводов!\nБыстрые выводы, повышенные лимиты и приоритетная обработка заявок\nПополняй 1xBet, Melbet, Mostbet, 1Win, Winwin, 888starz и выводи средства без задержек\nРегистрируйся по моей ссылке',
       copied: 'Ссылка скопирована!',
@@ -465,7 +465,7 @@ export default function ReferralPage() {
         'Share the link with friends',
         'The more your referrals deposit, the higher your ranking',
         'Top players by total referral deposits receive prizes',
-        'Prizes are distributed by ranking (1st-5th place) at the end of the month'
+        'Prizes are distributed by ranking (top-20) at the end of the month'
       ],
       shareText: 'Join the VIP deposit and withdrawal platform!\nFast withdrawals, higher limits, and priority request processing\nQuickly top up 1xBet, Melbet, Mostbet, 1Win, Winwin, 888starz and withdraw funds without delays\nRegister using my link',
       copied: 'Link copied!',
@@ -752,7 +752,7 @@ export default function ReferralPage() {
         
         {topPlayers.length > 0 ? (
           <>
-            {/* Призы - Топ-5 (показываем только если есть данные) */}
+            {/* Призы - Топ-3 и 4-20 места (показываем только если есть данные) */}
             <div className="referral-prizes-scroll flex gap-3 overflow-x-auto pb-1">
               <div className="min-w-[160px] rounded-2xl border border-green-500/30 bg-gradient-to-br from-green-400/25 to-emerald-500/10 p-3 text-center">
                 <div className="mx-auto mb-2 w-9 h-9 rounded-full bg-green-500 flex items-center justify-center text-black font-bold">1</div>
@@ -767,12 +767,8 @@ export default function ReferralPage() {
                 <div className="text-sm text-white/80 font-semibold">{t.thirdPlace()}</div>
               </div>
               <div className="min-w-[160px] rounded-2xl border border-lime-500/30 bg-gradient-to-br from-lime-400/25 to-lime-500/10 p-3 text-center">
-                <div className="mx-auto mb-2 w-9 h-9 rounded-full bg-lime-500 flex items-center justify-center text-black font-bold">4</div>
-                <div className="text-sm text-white/80 font-semibold">{t.fourthPlace()}</div>
-              </div>
-              <div className="min-w-[160px] rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-400/25 to-emerald-500/10 p-3 text-center">
-                <div className="mx-auto mb-2 w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-black font-bold">5</div>
-                <div className="text-sm text-white/80 font-semibold">{t.fifthPlace()}</div>
+                <div className="mx-auto mb-2 w-9 h-9 rounded-full bg-lime-500 flex items-center justify-center text-black font-bold">4-20</div>
+                <div className="text-sm text-white/80 font-semibold">4-20 место: {referralSettings.fourth_place_prize.toLocaleString()} сом</div>
               </div>
             </div>
 
@@ -788,9 +784,9 @@ export default function ReferralPage() {
               </div>
             )}
 
-            {/* Топ-5 реферов */}
+            {/* Топ-20 реферов */}
             <div className="space-y-3">
-              {topPlayers.slice(0, 5).map((player: any, index: number) => (
+              {topPlayers.slice(0, 20).map((player: any, index: number) => (
                 <div key={player.id} className="flex items-center justify-between rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-green-500/10 to-emerald-500/5 p-3">
                   <div className="flex items-center space-x-3">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
