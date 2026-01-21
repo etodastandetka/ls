@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
             AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
             AND r.amount > 0
             AND r.created_at >= ${currentMonthStart}::timestamp
+            AND r.created_at >= br.created_at
           GROUP BY br.referrer_id
           ORDER BY total_deposits DESC
           LIMIT 5
@@ -247,32 +248,33 @@ export async function GET(request: NextRequest) {
       }),
       // Получаем заработанные комиссии за текущий месяц (с 1 числа текущего месяца)
       // Исключаем записи month_close (закрытие месяца)
-      prisma.botReferralEarning.aggregate({
-        where: {
-          referrerId: userIdBigInt,
-          status: 'completed',
-          createdAt: {
-            gte: currentMonthStart
-          },
-          bookmaker: {
-            not: 'month_close'
-          }
-        },
-        _sum: {
-          commissionAmount: true
-        }
-      }),
+      // ЗАЩИТА ОТ АБУЗА: учитываем только заработок от депозитов, сделанных после создания реферальной связи
+      prisma.$queryRaw<Array<{
+        total: number | bigint
+      }>>`
+        SELECT COALESCE(SUM(bre.commission_amount), 0)::numeric as total
+        FROM "referral_earnings" bre
+        INNER JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
+        WHERE bre.referrer_id = ${userIdBigInt}
+          AND bre.status = 'completed'
+          AND bre.created_at >= ${currentMonthStart}::timestamp
+          AND bre.created_at >= br.created_at
+          AND (bre.bookmaker IS NULL OR bre.bookmaker != 'month_close')
+      `,
       // Получаем ВСЕ заработанные комиссии (для расчета доступного баланса - накопленные за все время)
-      prisma.botReferralEarning.aggregate({
-        where: {
-          referrerId: userIdBigInt,
-          status: 'completed'
-        },
-        _sum: {
-          commissionAmount: true
-        }
-      }),
+      // ЗАЩИТА ОТ АБУЗА: учитываем только заработок от депозитов, сделанных после создания реферальной связи
+      prisma.$queryRaw<Array<{
+        total: number | bigint
+      }>>`
+        SELECT COALESCE(SUM(bre.commission_amount), 0)::numeric as total
+        FROM "referral_earnings" bre
+        INNER JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
+        WHERE bre.referrer_id = ${userIdBigInt}
+          AND bre.status = 'completed'
+          AND bre.created_at >= br.created_at
+      `,
       // Получаем статистику депозитов рефералов за текущий месяц (с 1 числа)
+      // ЗАЩИТА ОТ АБУЗА: учитываем только депозиты, сделанные ПОСЛЕ создания реферальной связи
       prisma.$queryRaw<Array<{
         active_referrals: bigint,
         total_deposits: number
@@ -287,8 +289,10 @@ export async function GET(request: NextRequest) {
           AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
           AND r.amount > 0
           AND r.created_at >= ${currentMonthStart}::timestamp
+          AND r.created_at >= br.created_at
       `,
       // Получаем статистику депозитов рефералов за все время
+      // ЗАЩИТА ОТ АБУЗА: учитываем только депозиты, сделанные ПОСЛЕ создания реферальной связи
       prisma.$queryRaw<Array<{
         active_referrals: bigint,
         total_deposits: number
@@ -302,14 +306,19 @@ export async function GET(request: NextRequest) {
           AND r.request_type = 'deposit'
           AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
           AND r.amount > 0
+          AND r.created_at >= br.created_at
       `
     ])
     
     const referralCount = referrals
     // earned - заработок за текущий месяц (с 1 числа текущего месяца)
-    const earned = earningsCurrentMonth._sum.commissionAmount ? parseFloat(earningsCurrentMonth._sum.commissionAmount.toString()) : 0
+    const earned = earningsCurrentMonth.length > 0 && earningsCurrentMonth[0].total 
+      ? parseFloat(earningsCurrentMonth[0].total.toString()) 
+      : 0
     // totalEarned - весь заработок за все время (для расчета доступного баланса)
-    const totalEarned = earningsAll._sum.commissionAmount ? parseFloat(earningsAll._sum.commissionAmount.toString()) : 0
+    const totalEarned = earningsAll.length > 0 && earningsAll[0].total 
+      ? parseFloat(earningsAll[0].total.toString()) 
+      : 0
     const activeReferralCountCurrentMonth = statsCurrentMonth.length > 0 ? parseInt(statsCurrentMonth[0].active_referrals.toString()) : 0
     const totalDepositsCurrentMonth = statsCurrentMonth.length > 0 ? parseFloat(statsCurrentMonth[0].total_deposits.toString()) : 0
     const activeReferralCountAll = statsAll.length > 0 ? parseInt(statsAll[0].active_referrals.toString()) : 0
@@ -339,6 +348,7 @@ export async function GET(request: NextRequest) {
         AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
         AND r.amount > 0
         AND r.created_at >= ${currentMonthStart}::timestamp
+        AND r.created_at >= br.created_at
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
       LIMIT 5
@@ -542,13 +552,19 @@ export async function GET(request: NextRequest) {
     // Для каждого реферала получаем статистику депозитов и заработка
     const referralsList = await Promise.all(
       userReferrals.map(async (ref) => {
-        // Получаем общую сумму депозитов реферала (все время)
+        // ЗАЩИТА ОТ АБУЗА: учитываем только депозиты, сделанные ПОСЛЕ создания реферальной связи
+        const referralCreatedAt = ref.createdAt
+        
+        // Получаем общую сумму депозитов реферала (все время, но только после создания реферальной связи)
         const depositsStatsAll = await prisma.request.aggregate({
           where: {
             userId: ref.referredId,
             requestType: 'deposit',
             status: {
               in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
+            },
+            createdAt: {
+              gte: referralCreatedAt // Только депозиты после создания реферальной связи
             }
           },
           _sum: {
@@ -559,7 +575,7 @@ export async function GET(request: NextRequest) {
           }
         })
         
-        // Получаем сумму депозитов реферала за текущий месяц (с 1 числа)
+        // Получаем сумму депозитов реферала за текущий месяц (с 1 числа, но только после создания реферальной связи)
         const depositsStatsCurrentMonth = await prisma.request.aggregate({
           where: {
             userId: ref.referredId,
@@ -568,7 +584,7 @@ export async function GET(request: NextRequest) {
               in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
             },
             createdAt: {
-              gte: currentMonthStart
+              gte: currentMonthStart > referralCreatedAt ? currentMonthStart : referralCreatedAt // Максимум из двух дат
             }
           },
           _sum: {
@@ -579,12 +595,16 @@ export async function GET(request: NextRequest) {
           }
         })
         
-        // Получаем общий заработок от этого реферала (все время)
+        // Получаем общий заработок от этого реферала (все время, но только после создания реферальной связи)
+        // ЗАЩИТА ОТ АБУЗА: учитываем только заработок от депозитов, сделанных после создания реферальной связи
         const earningsStatsAll = await prisma.botReferralEarning.aggregate({
           where: {
             referrerId: userIdBigInt,
             referredId: ref.referredId,
-            status: 'completed'
+            status: 'completed',
+            createdAt: {
+              gte: referralCreatedAt // Только заработок после создания реферальной связи
+            }
           },
           _sum: {
             commissionAmount: true
@@ -594,7 +614,7 @@ export async function GET(request: NextRequest) {
           }
         })
         
-        // Получаем заработок от этого реферала за текущий месяц (с 1 числа)
+        // Получаем заработок от этого реферала за текущий месяц (с 1 числа, но только после создания реферальной связи)
         // Исключаем записи month_close (закрытие месяца)
         const earningsStatsCurrentMonth = await prisma.botReferralEarning.aggregate({
           where: {
@@ -602,7 +622,7 @@ export async function GET(request: NextRequest) {
             referredId: ref.referredId,
             status: 'completed',
             createdAt: {
-              gte: currentMonthStart
+              gte: currentMonthStart > referralCreatedAt ? currentMonthStart : referralCreatedAt // Максимум из двух дат
             },
             bookmaker: {
               not: 'month_close'

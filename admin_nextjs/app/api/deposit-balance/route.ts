@@ -133,7 +133,8 @@ export async function POST(request: NextRequest) {
         requestData.userId,
         parseFloat(requestData.amount.toString()),
         requestData.bookmaker,
-        parseInt(requestId)
+        parseInt(requestId),
+        requestData.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
       ).catch(error => {
         console.error(`❌ [Deposit Balance] Failed to process referral earning:`, error)
         // Не блокируем ответ, если начисление бонусов не удалось

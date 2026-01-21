@@ -503,7 +503,8 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         request.userId,
         requestAmount,
         request.bookmaker || null,
-        request.id
+        request.id,
+        request.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
       ).catch(error => {
         console.error(`❌ [Auto-Deposit] Failed to process referral earning:`, error)
         // Не блокируем выполнение, если начисление бонусов не удалось

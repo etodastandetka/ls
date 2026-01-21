@@ -135,7 +135,8 @@ export async function POST(
                 linkedRequest.userId,
                 requestAmount,
                 linkedRequest.bookmaker,
-                parseInt(requestId)
+                parseInt(requestId),
+                linkedRequest.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
               ).catch(error => {
                 console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
                 // Не блокируем выполнение, если начисление бонусов не удалось
@@ -151,7 +152,8 @@ export async function POST(
             linkedRequest.userId,
             requestAmount,
             linkedRequest.bookmaker,
-            parseInt(requestId)
+            parseInt(requestId),
+            linkedRequest.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
           ).catch(error => {
             console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
             // Не блокируем выполнение, если начисление бонусов не удалось

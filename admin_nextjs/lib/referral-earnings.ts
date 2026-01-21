@@ -12,7 +12,8 @@ export async function processReferralEarning(
   userId: bigint,
   depositAmount: number,
   bookmaker: string | null,
-  requestId?: number
+  requestId?: number,
+  depositCreatedAt?: Date
 ): Promise<boolean> {
   try {
     // Проверяем, есть ли у пользователя рефер
@@ -21,12 +22,41 @@ export async function processReferralEarning(
         referredId: userId
       },
       select: {
-        referrerId: true
+        referrerId: true,
+        createdAt: true // Получаем дату создания реферальной связи
       }
     })
     
     if (!referral) {
       // У пользователя нет рефера - ничего не делаем
+      return false
+    }
+    
+    // Если передан requestId, получаем дату создания депозита из заявки
+    let depositDate = depositCreatedAt
+    if (!depositDate && requestId) {
+      const request = await prisma.request.findUnique({
+        where: { id: requestId },
+        select: { createdAt: true }
+      })
+      if (request) {
+        depositDate = request.createdAt
+      }
+    }
+    
+    // Если дата депозита не определена, используем текущую дату (для обратной совместимости)
+    if (!depositDate) {
+      depositDate = new Date()
+    }
+    
+    // ЗАЩИТА ОТ АБУЗА: Проверяем, что депозит был сделан ПОСЛЕ создания реферальной связи
+    if (depositDate < referral.createdAt) {
+      console.log(`⚠️ [Referral Earnings] Депозит был сделан до создания реферальной связи. Пропускаем начисление.`, {
+        userId: userId.toString(),
+        depositDate: depositDate.toISOString(),
+        referralCreatedAt: referral.createdAt.toISOString(),
+        requestId: requestId
+      })
       return false
     }
     
