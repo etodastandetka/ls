@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
-import { sendTelegramGroupMessage } from '@/lib/telegram-group'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,48 +145,6 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`✅ [Close Month] Месяц закрыт успешно. Топ-5 за прошлый месяц сохранен.`)
-
-    // Формируем сообщение для канала
-    const monthNames = [
-      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
-    ]
-    const monthName = monthNames[lastMonthStart.getMonth()]
-    const year = lastMonthStart.getFullYear()
-
-    let channelMessage = `🎉 <b>Месяц успешно закрыт!</b>\n\n`
-    channelMessage += `📅 Период: ${monthName} ${year}\n\n`
-    channelMessage += `🏆 <b>Топ-5 рефералов месяца:</b>\n`
-    
-    lastMonthData.forEach((player, index) => {
-      const displayName = player.username 
-        ? `@${player.username}` 
-        : player.firstName 
-          ? `${player.firstName}${player.lastName ? ' ' + player.lastName : ''}`
-          : `ID: ${player.userId}`
-      channelMessage += `${index + 1}. ${displayName} - ${player.totalDeposits.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} сом\n`
-    })
-    
-    channelMessage += `\n💰 <b>Призы:</b>\n`
-    channelMessage += `🥇 1 место: ${TOP_PRIZES[0].toLocaleString()} сом\n`
-    channelMessage += `🥈 2 место: ${TOP_PRIZES[1].toLocaleString()} сом\n`
-    channelMessage += `🥉 3 место: ${TOP_PRIZES[2].toLocaleString()} сом\n`
-    channelMessage += `4 место: ${TOP_PRIZES[3].toLocaleString()} сом\n`
-    channelMessage += `5 место: ${TOP_PRIZES[4].toLocaleString()} сом\n`
-    
-    channelMessage += `\n✨ <b>Новый месяц начался!</b>\n\n`
-    channelMessage += `💵 Теперь вы снова можете зарабатывать <b>2%</b> с каждого депозита ваших рефералов!\n\n`
-    channelMessage += `📊 Приглашайте друзей и зарабатывайте вместе с нами!`
-
-    // Отправляем сообщение в канал (используется CHANNEL_ID или GROUP_CHAT_ID)
-    const channelId = process.env.CHANNEL_ID || process.env.GROUP_CHAT_ID
-    if (channelId) {
-      sendTelegramGroupMessage(channelMessage, channelId).catch(err => {
-        console.error('❌ [Close Month] Failed to send channel notification:', err)
-      })
-    } else {
-      console.warn('⚠️ [Close Month] CHANNEL_ID or GROUP_CHAT_ID not configured, skipping channel notification')
-    }
 
     return NextResponse.json(
       createApiResponse({
