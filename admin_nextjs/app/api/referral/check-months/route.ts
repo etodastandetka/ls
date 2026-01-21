@@ -199,7 +199,7 @@ export async function GET(request: NextRequest) {
         displayName: player.displayName,
         rank: player.rank,
         prize: player.prize,
-        command: `tsx scripts/add-referral-balance.ts ${player.userId} ${player.prize}`
+        command: `npx tsx scripts/add-referral-balance.ts ${player.userId} ${player.prize}`
       }))
 
     return NextResponse.json(createApiResponse({
