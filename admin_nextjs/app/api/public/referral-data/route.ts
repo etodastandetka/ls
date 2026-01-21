@@ -68,35 +68,14 @@ export async function GET(request: NextRequest) {
     // Если только топ, возвращаем только топ игроков
     if (topOnly) {
       try {
-        // Получаем дату начала текущего месяца из конфигурации
-        const monthStartConfig = await prisma.botConfiguration.findUnique({
-          where: { key: 'referral_current_month_start' }
-        })
+        // Дата начала текущего месяца (с 1 числа текущего месяца)
+        const nowDate = new Date()
+        const currentMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1)
+        currentMonthStart.setHours(0, 0, 0, 0)
         
-        let monthStartDate: Date | null = null
-        if (monthStartConfig && monthStartConfig.value) {
-          try {
-            const configValue = typeof monthStartConfig.value === 'string' 
-              ? monthStartConfig.value 
-              : JSON.stringify(monthStartConfig.value)
-            monthStartDate = new Date(configValue)
-            console.log('📅 [Referral Data API] Дата начала месяца из конфигурации (top_only):', monthStartDate.toISOString())
-          } catch (e) {
-            console.warn('⚠️ [Referral Data API] Failed to parse referral_current_month_start date:', e)
-          }
-        }
+        console.log('📅 [Referral Data API] Фильтрация топ-5 с даты (текущий месяц):', currentMonthStart.toISOString())
         
-        // Если дата не установлена, используем начало текущего месяца
-        if (!monthStartDate || isNaN(monthStartDate.getTime())) {
-          const now = new Date()
-          monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1)
-          monthStartDate.setHours(0, 0, 0, 0)
-          console.log('📅 [Referral Data API] Используем начало текущего месяца (по умолчанию, top_only):', monthStartDate.toISOString())
-        }
-        
-        console.log('📅 [Referral Data API] Фильтрация топ-5 с даты:', monthStartDate.toISOString())
-        
-        // Получаем топ-5 реферов через агрегацию (только за текущий месяц)
+        // Получаем топ-5 реферов через агрегацию (только за текущий месяц с 1 числа)
         const topReferrersRaw = await prisma.$queryRaw<Array<{
           referrer_id: bigint,
           total_deposits: number | bigint,
@@ -111,7 +90,7 @@ export async function GET(request: NextRequest) {
             AND r.request_type = 'deposit'
             AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
             AND r.amount > 0
-            AND r.created_at >= ${monthStartDate}::timestamp
+            AND r.created_at >= ${currentMonthStart}::timestamp
           GROUP BY br.referrer_id
           ORDER BY total_deposits DESC
           LIMIT 5
@@ -158,14 +137,14 @@ export async function GET(request: NextRequest) {
       })
       
       // Рассчитываем дату следующей выплаты
-      const now = new Date()
-      const currentDay = now.getDate()
+      const nowDateTop = new Date()
+      const currentDay = nowDateTop.getDate()
       let nextPayoutDate: Date
       
       if (currentDay < 21) {
-        nextPayoutDate = new Date(now.getFullYear(), now.getMonth(), 21)
+        nextPayoutDate = new Date(nowDateTop.getFullYear(), nowDateTop.getMonth(), 21)
       } else {
-        nextPayoutDate = new Date(now.getFullYear(), now.getMonth() + 1, 21)
+        nextPayoutDate = new Date(nowDateTop.getFullYear(), nowDateTop.getMonth() + 1, 21)
       }
       
       const monthNames = [
@@ -251,49 +230,32 @@ export async function GET(request: NextRequest) {
     
     console.log('🔍 [Referral Data API] Поиск рефералов для пользователя:', userIdBigInt.toString())
     
-    // Получаем дату начала текущего месяца из конфигурации
-    const monthStartConfig = await prisma.botConfiguration.findUnique({
-      where: { key: 'referral_current_month_start' }
-    })
+    // Дата начала текущего месяца (с 1 числа текущего месяца)
+    const now = new Date()
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    currentMonthStart.setHours(0, 0, 0, 0)
     
-    let monthStartDate: Date | null = null
-    if (monthStartConfig && monthStartConfig.value) {
-      try {
-        const configValue = typeof monthStartConfig.value === 'string' 
-          ? monthStartConfig.value 
-          : JSON.stringify(monthStartConfig.value)
-        monthStartDate = new Date(configValue)
-        console.log('📅 [Referral Data API] Дата начала месяца из конфигурации:', monthStartDate.toISOString())
-      } catch (e) {
-        console.warn('⚠️ [Referral Data API] Failed to parse referral_current_month_start date:', e)
-      }
-    }
-    
-    // Если дата не установлена, используем начало текущего месяца
-    if (!monthStartDate || isNaN(monthStartDate.getTime())) {
-      const now = new Date()
-      monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1)
-      monthStartDate.setHours(0, 0, 0, 0)
-      console.log('📅 [Referral Data API] Используем начало текущего месяца (по умолчанию):', monthStartDate.toISOString())
-    }
-    
-    console.log('📅 [Referral Data API] Фильтрация данных с даты:', monthStartDate.toISOString())
+    console.log('📅 [Referral Data API] Текущий месяц начинается с:', currentMonthStart.toISOString())
     
     // ОПТИМИЗИРОВАННЫЕ ЗАПРОСЫ: Используем параллельные запросы и агрегацию
-    const [referrals, earningsCurrentMonth, earningsAll, stats] = await Promise.all([
+    const [referrals, earningsCurrentMonth, earningsAll, statsCurrentMonth, statsAll] = await Promise.all([
       // Получаем только количество рефералов (без include для скорости)
       prisma.botReferral.count({
         where: {
           referrerId: userIdBigInt
         }
       }),
-      // Получаем заработанные комиссии за текущий месяц (для отображения earned)
+      // Получаем заработанные комиссии за текущий месяц (с 1 числа текущего месяца)
+      // Исключаем записи month_close (закрытие месяца)
       prisma.botReferralEarning.aggregate({
         where: {
           referrerId: userIdBigInt,
           status: 'completed',
           createdAt: {
-            gte: monthStartDate
+            gte: currentMonthStart
+          },
+          bookmaker: {
+            not: 'month_close'
           }
         },
         _sum: {
@@ -310,7 +272,7 @@ export async function GET(request: NextRequest) {
           commissionAmount: true
         }
       }),
-      // Получаем статистику депозитов рефералов через агрегацию (только за текущий месяц)
+      // Получаем статистику депозитов рефералов за текущий месяц (с 1 числа)
       prisma.$queryRaw<Array<{
         active_referrals: bigint,
         total_deposits: number
@@ -324,25 +286,44 @@ export async function GET(request: NextRequest) {
           AND r.request_type = 'deposit'
           AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
           AND r.amount > 0
-          AND r.created_at >= ${monthStartDate}::timestamp
+          AND r.created_at >= ${currentMonthStart}::timestamp
+      `,
+      // Получаем статистику депозитов рефералов за все время
+      prisma.$queryRaw<Array<{
+        active_referrals: bigint,
+        total_deposits: number
+      }>>`
+        SELECT 
+          COUNT(DISTINCT r.user_id) as active_referrals,
+          COALESCE(SUM(r.amount), 0) as total_deposits
+        FROM "referrals" br
+        INNER JOIN "requests" r ON r.user_id = br.referred_id
+        WHERE br.referrer_id = ${userIdBigInt}
+          AND r.request_type = 'deposit'
+          AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
+          AND r.amount > 0
       `
     ])
     
     const referralCount = referrals
-    // earned - заработок за текущий месяц (для отображения)
+    // earned - заработок за текущий месяц (с 1 числа текущего месяца)
     const earned = earningsCurrentMonth._sum.commissionAmount ? parseFloat(earningsCurrentMonth._sum.commissionAmount.toString()) : 0
     // totalEarned - весь заработок за все время (для расчета доступного баланса)
     const totalEarned = earningsAll._sum.commissionAmount ? parseFloat(earningsAll._sum.commissionAmount.toString()) : 0
-    const activeReferralCount = stats.length > 0 ? parseInt(stats[0].active_referrals.toString()) : 0
-    const totalDeposits = stats.length > 0 ? parseFloat(stats[0].total_deposits.toString()) : 0
+    const activeReferralCountCurrentMonth = statsCurrentMonth.length > 0 ? parseInt(statsCurrentMonth[0].active_referrals.toString()) : 0
+    const totalDepositsCurrentMonth = statsCurrentMonth.length > 0 ? parseFloat(statsCurrentMonth[0].total_deposits.toString()) : 0
+    const activeReferralCountAll = statsAll.length > 0 ? parseInt(statsAll[0].active_referrals.toString()) : 0
+    const totalDepositsAll = statsAll.length > 0 ? parseFloat(statsAll[0].total_deposits.toString()) : 0
     
     console.log('📊 [Referral Data API] Найдено рефералов:', referralCount)
-    console.log('📊 [Referral Data API] Активных рефералов:', activeReferralCount)
-    console.log('📊 [Referral Data API] Заработано:', earned)
+    console.log('📊 [Referral Data API] Активных рефералов (текущий месяц):', activeReferralCountCurrentMonth)
+    console.log('📊 [Referral Data API] Активных рефералов (все время):', activeReferralCountAll)
+    console.log('📊 [Referral Data API] Заработано (текущий месяц):', earned)
+    console.log('📊 [Referral Data API] Заработано (все время):', totalEarned)
     
     // ОПТИМИЗИРОВАННАЯ ЛОГИКА: Используем агрегацию на уровне БД для скорости
     // Получаем топ-5 реферов через агрегацию (быстрее чем обработка в памяти)
-    // Учитываем дату начала месяца
+    // Используем текущий месяц (с 1 числа)
     const topReferrersRaw = await prisma.$queryRaw<Array<{
       referrer_id: bigint,
       total_deposits: number,
@@ -357,7 +338,7 @@ export async function GET(request: NextRequest) {
         AND r.request_type = 'deposit'
         AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
         AND r.amount > 0
-        AND r.created_at >= ${monthStartDate}::timestamp
+        AND r.created_at >= ${currentMonthStart}::timestamp
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
       LIMIT 5
@@ -411,7 +392,7 @@ export async function GET(request: NextRequest) {
           AND r.request_type = 'deposit'
           AND r.status IN ('completed', 'approved', 'auto_completed', 'autodeposit_success')
           AND r.amount > 0
-          AND r.created_at >= ${monthStartDate}::timestamp
+          AND r.created_at >= ${currentMonthStart}::timestamp
         GROUP BY br.referrer_id
       )
       SELECT referrer_id, total_deposits, rank
@@ -431,7 +412,7 @@ export async function GET(request: NextRequest) {
     if (userRank === 0) {
       if (referralCount === 0) {
         notInTopReason = 'no_referrals' // Нет рефералов
-      } else if (totalDeposits === 0) {
+      } else if (totalDepositsCurrentMonth === 0) {
         notInTopReason = 'no_deposits' // Рефералы не делали депозиты
       } else {
         notInTopReason = 'low_amount' // Сумма депозитов меньше, чем у топ-5
@@ -518,16 +499,16 @@ export async function GET(request: NextRequest) {
     console.log('📊 [Referral Data API] Есть pending заявка:', hasPendingWithdrawal, `(${pendingWithdrawals.length} заявок)`)
     
     // Рассчитываем дату следующей выплаты (21 число каждого месяца)
-    const now = new Date()
-    const currentDay = now.getDate()
+    const nowDate = new Date()
+    const currentDay = nowDate.getDate()
     let nextPayoutDate: Date
     
     if (currentDay < 21) {
       // Если сегодняшнее число меньше 21, следующая выплата будет 21 числа текущего месяца
-      nextPayoutDate = new Date(now.getFullYear(), now.getMonth(), 21)
+      nextPayoutDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), 21)
     } else {
       // Если сегодняшнее число больше или равно 21, следующая выплата будет 21 числа следующего месяца
-      nextPayoutDate = new Date(now.getFullYear(), now.getMonth() + 1, 21)
+      nextPayoutDate = new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 21)
     }
     
     // Форматируем дату на русском языке
@@ -561,8 +542,8 @@ export async function GET(request: NextRequest) {
     // Для каждого реферала получаем статистику депозитов и заработка
     const referralsList = await Promise.all(
       userReferrals.map(async (ref) => {
-        // Получаем общую сумму депозитов реферала
-        const depositsStats = await prisma.request.aggregate({
+        // Получаем общую сумму депозитов реферала (все время)
+        const depositsStatsAll = await prisma.request.aggregate({
           where: {
             userId: ref.referredId,
             requestType: 'deposit',
@@ -578,8 +559,28 @@ export async function GET(request: NextRequest) {
           }
         })
         
-        // Получаем общий заработок от этого реферала
-        const earningsStats = await prisma.botReferralEarning.aggregate({
+        // Получаем сумму депозитов реферала за текущий месяц (с 1 числа)
+        const depositsStatsCurrentMonth = await prisma.request.aggregate({
+          where: {
+            userId: ref.referredId,
+            requestType: 'deposit',
+            status: {
+              in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
+            },
+            createdAt: {
+              gte: currentMonthStart
+            }
+          },
+          _sum: {
+            amount: true
+          },
+          _count: {
+            id: true
+          }
+        })
+        
+        // Получаем общий заработок от этого реферала (все время)
+        const earningsStatsAll = await prisma.botReferralEarning.aggregate({
           where: {
             referrerId: userIdBigInt,
             referredId: ref.referredId,
@@ -593,10 +594,36 @@ export async function GET(request: NextRequest) {
           }
         })
         
-        const totalDeposits = depositsStats._sum.amount ? parseFloat(depositsStats._sum.amount.toString()) : 0
-        const totalEarnings = earningsStats._sum.commissionAmount ? parseFloat(earningsStats._sum.commissionAmount.toString()) : 0
-        const depositsCount = depositsStats._count.id || 0
-        const earningsCount = earningsStats._count.id || 0
+        // Получаем заработок от этого реферала за текущий месяц (с 1 числа)
+        // Исключаем записи month_close (закрытие месяца)
+        const earningsStatsCurrentMonth = await prisma.botReferralEarning.aggregate({
+          where: {
+            referrerId: userIdBigInt,
+            referredId: ref.referredId,
+            status: 'completed',
+            createdAt: {
+              gte: currentMonthStart
+            },
+            bookmaker: {
+              not: 'month_close'
+            }
+          },
+          _sum: {
+            commissionAmount: true
+          },
+          _count: {
+            id: true
+          }
+        })
+        
+        const totalDeposits = depositsStatsAll._sum.amount ? parseFloat(depositsStatsAll._sum.amount.toString()) : 0
+        const totalDepositsCurrentMonth = depositsStatsCurrentMonth._sum.amount ? parseFloat(depositsCurrentMonth._sum.amount.toString()) : 0
+        const totalEarnings = earningsStatsAll._sum.commissionAmount ? parseFloat(earningsStatsAll._sum.commissionAmount.toString()) : 0
+        const totalEarningsCurrentMonth = earningsStatsCurrentMonth._sum.commissionAmount ? parseFloat(earningsStatsCurrentMonth._sum.commissionAmount.toString()) : 0
+        const depositsCount = depositsStatsAll._count.id || 0
+        const depositsCountCurrentMonth = depositsStatsCurrentMonth._count.id || 0
+        const earningsCount = earningsStatsAll._count.id || 0
+        const earningsCountCurrentMonth = earningsStatsCurrentMonth._count.id || 0
         
         return {
           referred_id: ref.referredId.toString(),
@@ -609,26 +636,34 @@ export async function GET(request: NextRequest) {
               ? `${ref.referred.firstName}${ref.referred.lastName ? ' ' + ref.referred.lastName : ''}`
               : `Игрок #${ref.referredId}`,
           createdAt: ref.createdAt.toISOString(),
-          total_deposits: totalDeposits,
-          total_earnings: totalEarnings,
-          deposits_count: depositsCount,
-          earnings_count: earningsCount
+          total_deposits: totalDeposits, // Все депозиты
+          total_deposits_current_month: totalDepositsCurrentMonth, // Депозиты за текущий месяц
+          total_earnings: totalEarnings, // Весь заработок
+          total_earnings_current_month: totalEarningsCurrentMonth, // Заработок за текущий месяц
+          deposits_count: depositsCount, // Количество депозитов (все время)
+          deposits_count_current_month: depositsCountCurrentMonth, // Количество депозитов за текущий месяц
+          earnings_count: earningsCount, // Количество заработков (все время)
+          earnings_count_current_month: earningsCountCurrentMonth // Количество заработков за текущий месяц
         }
       })
     )
     
     const responseData = {
       success: true,
-      earned: earned,
+      earned: earned, // Заработок за текущий месяц (с 1 числа)
+      earned_all: totalEarned, // Весь заработок за все время
       available_balance: availableBalance, // Доступный баланс для вывода
       has_pending_withdrawal: hasPendingWithdrawal, // Есть ли pending заявка
-      referral_count: activeReferralCount, // Количество рефералов, которые сделали депозиты
+      referral_count: activeReferralCountCurrentMonth, // Количество рефералов, которые сделали депозиты за текущий месяц
+      referral_count_all: activeReferralCountAll, // Количество рефералов, которые сделали депозиты за все время
       total_referrals: referralCount, // Общее количество рефералов (включая тех, кто не делал депозиты)
+      total_deposits_current_month: totalDepositsCurrentMonth, // Сумма депозитов за текущий месяц
+      total_deposits_all: totalDepositsAll, // Сумма депозитов за все время
       referrals: referralsList, // Список рефералов пользователя
       top_players: topReferrersWithPrizes, // Топ-5 реферов
       user_rank: userRank > 0 ? userRank : null, // Место в рейтинге (null если не в топе)
       user_in_top5: userInTop5, // В топ-5 или нет
-      user_total_deposits: userTotalDeposits, // Сумма всех депозитов рефералов пользователя
+      user_total_deposits: userTotalDeposits, // Сумма всех депозитов рефералов пользователя за текущий месяц
       not_in_top_reason: notInTopReason, // Причина, почему не в топе (если не в топе)
       // Минимальная сумма для попадания в топ-5 (сумма 5-го места)
       min_amount_for_top5: topReferrersWithPrizes.length >= 5 

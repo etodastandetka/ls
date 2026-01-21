@@ -146,6 +146,61 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ [Close Month] Месяц закрыт успешно. Топ-5 за прошлый месяц сохранен.`)
 
+    // Вычитаем заработок за закрытый месяц из доступного баланса всех пользователей
+    // Создаем отрицательные записи в BotReferralEarning для каждого пользователя
+    console.log(`🔄 [Close Month] Вычитаем заработок за закрытый месяц из балансов...`)
+    
+    // Получаем всех пользователей, которые заработали за закрытый месяц
+    const earningsForClosedMonth = await prisma.botReferralEarning.findMany({
+      where: {
+        status: 'completed',
+        createdAt: {
+          gte: lastMonthStart,
+          lte: lastMonthEnd
+        },
+        bookmaker: {
+          not: 'month_close' // Исключаем уже созданные записи о закрытии месяца
+        }
+      },
+      select: {
+        referrerId: true,
+        commissionAmount: true
+      }
+    })
+
+    // Группируем по пользователям и суммируем заработок
+    const earningsByUser = new Map<bigint, number>()
+    for (const earning of earningsForClosedMonth) {
+      const current = earningsByUser.get(earning.referrerId) || 0
+      const amount = parseFloat(earning.commissionAmount.toString())
+      earningsByUser.set(earning.referrerId, current + amount)
+    }
+
+    // Создаем отрицательные записи для каждого пользователя
+    let resetCount = 0
+    for (const [userId, totalEarned] of earningsByUser.entries()) {
+      if (totalEarned > 0) {
+        try {
+          await prisma.botReferralEarning.create({
+            data: {
+              referrerId: userId,
+              referredId: userId, // Используем самого пользователя
+              amount: -totalEarned,
+              commissionAmount: -totalEarned, // Отрицательная сумма для вычитания
+              bookmaker: 'month_close', // Маркер закрытия месяца
+              status: 'completed'
+            }
+          })
+          resetCount++
+          console.log(`  ✅ [Close Month] Вычтен заработок для пользователя ${userId}: ${totalEarned.toFixed(2)} сом`)
+        } catch (error: any) {
+          console.error(`  ❌ [Close Month] Ошибка при вычитании заработка для пользователя ${userId}:`, error)
+        }
+      }
+    }
+
+    console.log(`✅ [Close Month] Заработок за закрытый месяц вычтен для ${resetCount} пользователей`)
+
     return NextResponse.json(
       createApiResponse({
         message: `Месяц закрыт успешно. Новый месяц начат с ${newMonthStart.toLocaleDateString('ru-RU')}`,
