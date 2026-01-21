@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         
         console.log('📅 [Referral Data API] Фильтрация топ-5 с даты:', currentMonthStart.toISOString())
         
-        // Получаем топ-5 реферов через агрегацию (только за текущий месяц с 1 числа)
+        // Получаем топ-20 реферов через агрегацию (только за текущий месяц с 1 числа)
         const topReferrersRaw = await prisma.$queryRaw<Array<{
           referrer_id: bigint,
           total_deposits: number | bigint,
@@ -117,10 +117,10 @@ export async function GET(request: NextRequest) {
             AND r.created_at >= br.created_at
           GROUP BY br.referrer_id
           ORDER BY total_deposits DESC
-          LIMIT 5
+          LIMIT 20
         `
         
-        // Получаем данные пользователей для топ-5
+        // Получаем данные пользователей для топ-20
         const topReferrerIds = topReferrersRaw.length > 0 
           ? topReferrersRaw.map(r => r.referrer_id)
           : []
@@ -140,7 +140,13 @@ export async function GET(request: NextRequest) {
       
       const userMap = new Map(topReferrerUsers.map(u => [u.userId.toString(), u]))
       
-      const prizeDistribution = [10000, 5000, 2500, 1500, 1000]
+      // Призы для топ-20: 1 место - 20000, 2 место - 10000, 3 место - 5000, 4-20 места - по 1000
+      const prizeDistribution = [
+        20000, // 1 место
+        10000, // 2 место
+        5000,  // 3 место
+        ...Array(17).fill(1000) // 4-20 места по 1000 сом
+      ]
       
       const topReferrers = topReferrersRaw.map((ref, index) => {
         const user = userMap.get(ref.referrer_id.toString())
@@ -188,7 +194,7 @@ export async function GET(request: NextRequest) {
           third_place_prize: prizeDistribution[2],
           fourth_place_prize: prizeDistribution[3],
           fifth_place_prize: prizeDistribution[4],
-          total_prize_pool: 20000,
+          total_prize_pool: 52000, // 20000 + 10000 + 5000 + 17*1000 = 52000
           next_payout_date: nextPayoutDateFormatted
         }
       })
@@ -203,12 +209,12 @@ export async function GET(request: NextRequest) {
           settings: {
             referral_percentage: 2,
             min_payout: 100,
-            first_place_prize: 10000,
-            second_place_prize: 5000,
-            third_place_prize: 2500,
-            fourth_place_prize: 1500,
+            first_place_prize: 20000,
+            second_place_prize: 10000,
+            third_place_prize: 5000,
+            fourth_place_prize: 1000,
             fifth_place_prize: 1000,
-            total_prize_pool: 20000,
+            total_prize_pool: 52000,
             next_payout_date: '1 ноября'
           }
         })

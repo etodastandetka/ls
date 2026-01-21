@@ -3,13 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/api-helpers'
 import { sendTelegramGroupMessage } from '@/lib/telegram-group'
 
-// Призы для топ-рефералов
+// Призы для топ-рефералов (топ-20)
 const TOP_PRIZES = [
-  10000, // 1 место
-  5000,  // 2 место
-  2500,  // 3 место
-  1500,  // 4 место
-  1000   // 5 место
+  20000, // 1 место
+  10000, // 2 место
+  5000,  // 3 место
+  ...Array(17).fill(1000) // 4-20 места по 1000 сом
 ]
 
 export async function POST(request: NextRequest) {
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
       monthStartDate.setHours(0, 0, 0, 0)
     }
     
-    // Получаем топ-5 реферов через агрегацию (только за текущий месяц)
+    // Получаем топ-20 реферов через агрегацию (только за текущий месяц)
     const topReferrersRaw = await prisma.$queryRaw<Array<{
       referrer_id: bigint,
       total_deposits: number | bigint,
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
         AND r.created_at >= ${monthStartDate}::timestamp
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
-      LIMIT 5
+      LIMIT 20
     `
     
     if (topReferrersRaw.length === 0) {
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
     
-    // Получаем данные пользователей для топ-5
+    // Получаем данные пользователей для топ-20
     const topReferrerIds = topReferrersRaw.map(r => r.referrer_id)
     const topReferrerUsers = await prisma.botUser.findMany({
       where: {

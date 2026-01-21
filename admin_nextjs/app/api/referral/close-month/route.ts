@@ -4,8 +4,13 @@ import { requireAuth, createApiResponse } from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
-// Призы для топ-рефералов
-const TOP_PRIZES = [10000, 5000, 2500, 1500, 1000]
+// Призы для топ-рефералов (топ-20)
+const TOP_PRIZES = [
+  20000, // 1 место
+  10000, // 2 место
+  5000,  // 3 место
+  ...Array(17).fill(1000) // 4-20 места по 1000 сом
+]
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +37,7 @@ export async function POST(request: NextRequest) {
     console.log(`   Прошлый месяц: ${lastMonthStart.toISOString()} - ${lastMonthEnd.toISOString()}`)
     console.log(`   Новый месяц начинается: ${newMonthStart.toISOString()}`)
 
-    // Получаем топ-5 реферов за прошлый месяц
+    // Получаем топ-20 реферов за прошлый месяц
     const topReferrersRaw = await prisma.$queryRaw<Array<{
       referrer_id: bigint,
       total_deposits: number | bigint,
@@ -51,7 +56,7 @@ export async function POST(request: NextRequest) {
         AND r.created_at <= ${lastMonthEnd}::timestamp
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
-      LIMIT 5
+      LIMIT 20
     `
 
     if (topReferrersRaw.length === 0) {
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Получаем данные пользователей для топ-5
+    // Получаем данные пользователей для топ-20
     const topReferrerIds = topReferrersRaw.map(r => r.referrer_id)
     const topReferrerUsers = await prisma.botUser.findMany({
       where: {
@@ -144,7 +149,7 @@ export async function POST(request: NextRequest) {
       match: verifyConfig?.value === monthStartValue
     })
 
-    console.log(`✅ [Close Month] Месяц закрыт успешно. Топ-5 за прошлый месяц сохранен.`)
+    console.log(`✅ [Close Month] Месяц закрыт успешно. Топ-20 за прошлый месяц сохранен.`)
 
     // Вычитаем заработок за закрытый месяц из доступного баланса всех пользователей
     // Создаем отрицательные записи в BotReferralEarning для каждого пользователя

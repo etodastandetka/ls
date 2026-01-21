@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/api-helpers'
 
-// Призы для топ-рефералов
-const TOP_PRIZES = [10000, 5000, 2500, 1500, 1000]
+// Призы для топ-рефералов (топ-20)
+const TOP_PRIZES = [
+  20000, // 1 место
+  10000, // 2 место
+  5000,  // 3 место
+  ...Array(17).fill(1000) // 4-20 места по 1000 сом
+]
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +35,7 @@ export async function GET(request: NextRequest) {
       monthStartDate.setHours(0, 0, 0, 0)
     }
     
-    // Получаем топ-5 реферов через агрегацию (только за текущий месяц)
+    // Получаем топ-20 реферов через агрегацию (только за текущий месяц)
     const topReferrersRaw = await prisma.$queryRaw<Array<{
       referrer_id: bigint,
       total_deposits: number | bigint,
@@ -48,10 +53,10 @@ export async function GET(request: NextRequest) {
         AND r.created_at >= ${monthStartDate}::timestamp
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
-      LIMIT 5
+      LIMIT 20
     `
     
-    // Получаем данные пользователей для топ-5
+    // Получаем данные пользователей для топ-20
     const topReferrerIds = topReferrersRaw.length > 0 
       ? topReferrersRaw.map(r => r.referrer_id)
       : []

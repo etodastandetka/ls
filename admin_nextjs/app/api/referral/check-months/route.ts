@@ -4,8 +4,13 @@ import { requireAuth, createApiResponse } from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
-// Призы для топ-рефералов
-const TOP_PRIZES = [10000, 5000, 2500, 1500, 1000]
+// Призы для топ-рефералов (топ-20)
+const TOP_PRIZES = [
+  20000, // 1 место
+  10000, // 2 место
+  5000,  // 3 место
+  ...Array(17).fill(1000) // 4-20 места по 1000 сом
+]
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,7 +71,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Получаем топ-5 игроков за период с 21 декабря 2025 до 21 января 2026
+    // 3. Получаем топ-20 игроков за период с 21 декабря 2025 до 21 января 2026
     const periodStart = new Date('2025-12-21T00:00:00.000Z')
     const periodEnd = new Date('2026-01-21T00:00:00.000Z')
 
@@ -88,7 +93,7 @@ export async function GET(request: NextRequest) {
         AND r.created_at < ${periodEnd}::timestamp
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
-      LIMIT 5
+      LIMIT 20
     `
 
     if (topReferrersRaw.length > 0) {
