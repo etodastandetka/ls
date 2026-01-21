@@ -9,7 +9,15 @@ const TOP_PRIZES = [10000, 5000, 2500, 1500, 1000]
 
 export async function GET(request: NextRequest) {
   try {
-    requireAuth(request)
+    // Проверяем авторизацию
+    try {
+      requireAuth(request)
+    } catch (authError: any) {
+      return NextResponse.json(
+        createApiResponse(null, 'Unauthorized - требуется авторизация'),
+        { status: 401 }
+      )
+    }
 
     const result: any = {
       closedMonths: [],
