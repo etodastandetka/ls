@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
     console.log(`🔄 [Close Month] Вычитаем заработок за закрытый месяц из балансов...`)
     
     // Получаем всех пользователей, которые заработали за закрытый месяц
+    // ИСКЛЮЧАЕМ призы за топ (top_payout) - они не должны вычитаться!
     const earningsForClosedMonth = await prisma.botReferralEarning.findMany({
       where: {
         status: 'completed',
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
           lte: lastMonthEnd
         },
         bookmaker: {
-          not: 'month_close' // Исключаем уже созданные записи о закрытии месяца
+          notIn: ['month_close', 'top_payout'] // Исключаем записи о закрытии месяца и призы за топ
         }
       },
       select: {
