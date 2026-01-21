@@ -637,7 +637,7 @@ export async function GET(request: NextRequest) {
         })
         
         const totalDeposits = depositsStatsAll._sum.amount ? parseFloat(depositsStatsAll._sum.amount.toString()) : 0
-        const totalDepositsCurrentMonth = depositsStatsCurrentMonth._sum.amount ? parseFloat(depositsCurrentMonth._sum.amount.toString()) : 0
+        const totalDepositsCurrentMonth = depositsStatsCurrentMonth._sum.amount ? parseFloat(depositsStatsCurrentMonth._sum.amount.toString()) : 0
         const totalEarnings = earningsStatsAll._sum.commissionAmount ? parseFloat(earningsStatsAll._sum.commissionAmount.toString()) : 0
         const totalEarningsCurrentMonth = earningsStatsCurrentMonth._sum.commissionAmount ? parseFloat(earningsStatsCurrentMonth._sum.commissionAmount.toString()) : 0
         const depositsCount = depositsStatsAll._count.id || 0
