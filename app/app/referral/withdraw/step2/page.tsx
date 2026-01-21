@@ -30,8 +30,6 @@ function ReferralWithdrawStep2Content() {
 
       const apiUrl = getApiBase()
       
-      console.log('🔄 Загрузка доступного баланса:', { userId, apiUrl })
-      
       const response = await safeFetch(`${apiUrl}/api/public/referral-data?user_id=${userId}`, {
         timeout: 15000,
         retries: 1,
@@ -39,25 +37,16 @@ function ReferralWithdrawStep2Content() {
       })
       
       if (!response.ok) {
-        console.error('❌ Ошибка загрузки баланса:', {
-          status: response.status,
-          statusText: response.statusText
-        })
         return
       }
       
       const data = await response.json()
-      console.log('✅ Баланс загружен:', { available_balance: data.available_balance })
       
       if (data.success) {
         setAvailableBalance(data.available_balance || 0)
       }
     } catch (error: any) {
-      console.error('❌ Ошибка загрузки доступного баланса:', {
-        error,
-        message: error?.message,
-        name: error?.name
-      })
+      // Игнорируем ошибки загрузки баланса
     }
   }
 
@@ -106,7 +95,7 @@ function ReferralWithdrawStep2Content() {
             userId = userData.id
           }
         } catch (e) {
-          console.error('Error parsing initData:', e)
+          // Игнорируем ошибки парсинга
         }
       }
 
@@ -125,14 +114,6 @@ function ReferralWithdrawStep2Content() {
       }
 
       const apiUrl = getApiBase()
-
-      console.log('🔄 Создание заявки на вывод:', {
-        userId,
-        bookmaker,
-        accountId: accountId.trim(),
-        amount: availableBalance,
-        apiUrl: `${apiUrl}/api/referral/withdraw/create`
-      })
 
       const requestBody = {
         user_id: userId,
@@ -193,19 +174,12 @@ function ReferralWithdrawStep2Content() {
           }
         } catch (parseError) {
           // Если не удалось распарсить JSON, используем текст или общее сообщение
-          console.error('❌ Не удалось распарсить ошибку как JSON:', parseError)
           if (responseText && responseText.length < 500 && !responseText.includes('<html') && !responseText.includes('<!DOCTYPE')) {
             errorMessage = responseText
           } else {
             errorMessage = `Ошибка сервера: ${response.status} ${response.statusText || ''}`
           }
         }
-        console.error('❌ Ошибка ответа сервера:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorMessage,
-          responseText: responseText.substring(0, 200)
-        })
         throw new Error(errorMessage)
       }
 
@@ -217,10 +191,8 @@ function ReferralWithdrawStep2Content() {
         }
         data = JSON.parse(responseText)
       } catch (parseError: any) {
-        console.error('❌ Ошибка парсинга успешного ответа:', parseError)
         throw new Error('Не удалось обработать ответ сервера')
       }
-      console.log('✅ Данные ответа:', data)
 
       if (data.success) {
         alert('Заявка на вывод создана успешно! Вывод выполнен автоматически.')
@@ -234,13 +206,6 @@ function ReferralWithdrawStep2Content() {
         alert(`Ошибка: ${data.error || 'Не удалось создать заявку'}`)
       }
     } catch (error: any) {
-      console.error('❌ Ошибка создания заявки на вывод:', {
-        error,
-        message: error?.message,
-        name: error?.name,
-        stack: error?.stack
-      })
-      
       let errorMessage = 'Не удалось создать заявку'
       if (error?.message) {
         errorMessage = error.message

@@ -60,24 +60,40 @@ export async function POST(request: NextRequest) {
       return errorResponse
     }
     
-    // Проверяем, есть ли у пользователя достаточно средств для вывода
-    const earnings = await prisma.botReferralEarning.findMany({
-      where: {
-        referrer: {
-          userId: BigInt(userId)
-        },
-        status: 'completed'
-      }
-    })
+    // Используем ту же логику расчета баланса, что и в /api/public/referral-data
+    const userIdBigInt = BigInt(userId)
     
-    const totalEarned = earnings.reduce((sum, e) => {
-      return sum + (e.commissionAmount ? parseFloat(e.commissionAmount.toString()) : 0)
-    }, 0)
+    // Получаем ВСЕ заработанные комиссии (для расчета доступного баланса - накопленные за все время)
+    // ЗАЩИТА ОТ АБУЗА: учитываем только заработок от депозитов, сделанных после создания реферальной связи
+    // НО: для записей где referred_id = referrer_id (призы за топ, восстановления, вычеты за абуз) - не требуем JOIN
+    const earningsResult = await prisma.$queryRaw<Array<{
+      total: number | bigint
+    }>>`
+      SELECT COALESCE(SUM(bre.commission_amount), 0)::numeric as total
+      FROM "referral_earnings" bre
+      LEFT JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
+      WHERE bre.referrer_id = ${userIdBigInt}
+        AND bre.status = 'completed'
+        AND (
+          -- Для обычных заработков - проверяем дату создания реферальной связи
+          (br.id IS NOT NULL AND bre.referred_id != bre.referrer_id AND bre.created_at >= br.created_at)
+          OR
+          -- Для призов за топ, восстановлений, тестовых записей и вычетов за абуз (referred_id = referrer_id) - не требуем JOIN
+          (bre.referred_id = bre.referrer_id AND (
+            bre.bookmaker = 'top_payout' 
+            OR bre.bookmaker = 'top_payout_restore' 
+            OR bre.bookmaker = 'test'
+            OR bre.bookmaker LIKE 'abuse_deduction%'
+          ))
+        )
+    `
+    
+    const totalEarned = earningsResult[0]?.total ? parseFloat(earningsResult[0].total.toString()) : 0
     
     // Получаем уже выведенные средства (только completed - подтвержденные админом и выплаченные)
     const completedWithdrawals = await prisma.referralWithdrawalRequest.findMany({
       where: {
-        userId: BigInt(userId),
+        userId: userIdBigInt,
         status: 'completed'
       }
     })
@@ -88,8 +104,6 @@ export async function POST(request: NextRequest) {
     
     // Доступный баланс = заработанное - выведенное (pending заявки НЕ учитываются - деньги остаются на балансе)
     const availableBalance = totalEarned - totalWithdrawn
-    
-    console.log(`[Referral Withdraw Create] User ${userId}: Earned=${totalEarned.toFixed(2)}, Withdrawn=${totalWithdrawn.toFixed(2)}, Available=${availableBalance.toFixed(2)}`)
     
     if (availableBalance <= 0) {
       const errorResponse = NextResponse.json({
@@ -135,8 +149,6 @@ export async function POST(request: NextRequest) {
       }
     })
     
-    console.log(`✅ [Referral Withdraw Create] Заявка #${withdrawalRequest.id} создана успешно. Начинаю автоматический вывод...`)
-    
     // АВТОМАТИЧЕСКИЙ ВЫВОД - сразу пополняем баланс в казино
     const { depositToCasino } = await import('../../../../../lib/deposit-balance')
     
@@ -158,8 +170,6 @@ export async function POST(request: NextRequest) {
         }
       })
       
-      console.log(`✅ [Referral Withdraw Create] Заявка #${withdrawalRequest.id} автоматически обработана. Сумма ${amount.toFixed(2)} сом пополнена в казино.`)
-      
       // Отправляем уведомление в группу об успешном автоматическом выводе
       const amountStr = parseFloat(updatedRequest.amount.toString()).toFixed(2)
       const usernameStr = updatedRequest.username || updatedRequest.firstName || 'Пользователь'
@@ -172,9 +182,7 @@ export async function POST(request: NextRequest) {
         `📋 ID заявки: #${updatedRequest.id}\n\n` +
         `Статус: автоматически пополнен ✅`
       
-      sendTelegramGroupMessage(groupMessage).catch(err => {
-        console.error('Failed to send referral withdrawal notification to group:', err)
-      })
+      sendTelegramGroupMessage(groupMessage).catch(() => {})
       
       const response = NextResponse.json({
         success: true,
@@ -186,8 +194,6 @@ export async function POST(request: NextRequest) {
       return response
       
     } catch (casinoError: any) {
-      console.error(`❌ [Referral Withdraw Create] Ошибка автоматического вывода для заявки #${withdrawalRequest.id}:`, casinoError)
-      
       // Обновляем статус на rejected, если не удалось пополнить
       await prisma.referralWithdrawalRequest.update({
         where: { id: withdrawalRequest.id },
@@ -210,9 +216,7 @@ export async function POST(request: NextRequest) {
         `📋 ID заявки: #${withdrawalRequest.id}\n` +
         `⚠️ Ошибка: ${casinoError.message || 'Неизвестная ошибка'}`
       
-      sendTelegramGroupMessage(errorMessage).catch(err => {
-        console.error('Failed to send error notification to group:', err)
-      })
+      sendTelegramGroupMessage(errorMessage).catch(() => {})
       
       const errorResponse = NextResponse.json({
         success: false,
@@ -224,7 +228,6 @@ export async function POST(request: NextRequest) {
     }
     
   } catch (error: any) {
-    console.error('Referral withdrawal create error:', error)
     const errorResponse = NextResponse.json({
       success: false,
       error: error.message || 'Failed to create withdrawal request'
