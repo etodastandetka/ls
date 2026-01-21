@@ -4,7 +4,6 @@
  * Использование: npx tsx scripts/restore-top-prizes.ts
  */
 
-require('dotenv').config()
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
