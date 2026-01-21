@@ -293,29 +293,43 @@ export async function GET(request: NextRequest) {
       // Получаем заработанные комиссии за текущий месяц (с 1 числа текущего месяца)
       // Исключаем записи month_close (закрытие месяца)
       // ЗАЩИТА ОТ АБУЗА: учитываем только заработок от депозитов, сделанных после создания реферальной связи
+      // НО: для записей где referred_id = referrer_id (призы за топ, восстановления) - не требуем JOIN
       prisma.$queryRaw<Array<{
         total: number | bigint
       }>>`
         SELECT COALESCE(SUM(bre.commission_amount), 0)::numeric as total
         FROM "referral_earnings" bre
-        INNER JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
+        LEFT JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
         WHERE bre.referrer_id = ${userIdBigInt}
           AND bre.status = 'completed'
           AND bre.created_at >= ${currentMonthStart}::timestamp
-          AND bre.created_at >= br.created_at
           AND (bre.bookmaker IS NULL OR bre.bookmaker != 'month_close')
+          AND (
+            -- Для обычных заработков - проверяем дату создания реферальной связи
+            (bre.referred_id != bre.referrer_id AND bre.created_at >= br.created_at)
+            OR
+            -- Для призов за топ и восстановлений (referred_id = referrer_id) - не требуем JOIN
+            (bre.referred_id = bre.referrer_id AND (bre.bookmaker = 'top_payout' OR bre.bookmaker = 'top_payout_restore' OR bre.bookmaker = 'test'))
+          )
       `,
       // Получаем ВСЕ заработанные комиссии (для расчета доступного баланса - накопленные за все время)
       // ЗАЩИТА ОТ АБУЗА: учитываем только заработок от депозитов, сделанных после создания реферальной связи
+      // НО: для записей где referred_id = referrer_id (призы за топ, восстановления) - не требуем JOIN
       prisma.$queryRaw<Array<{
         total: number | bigint
       }>>`
         SELECT COALESCE(SUM(bre.commission_amount), 0)::numeric as total
         FROM "referral_earnings" bre
-        INNER JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
+        LEFT JOIN "referrals" br ON br.referred_id = bre.referred_id AND br.referrer_id = bre.referrer_id
         WHERE bre.referrer_id = ${userIdBigInt}
           AND bre.status = 'completed'
-          AND bre.created_at >= br.created_at
+          AND (
+            -- Для обычных заработков - проверяем дату создания реферальной связи
+            (bre.referred_id != bre.referrer_id AND bre.created_at >= br.created_at)
+            OR
+            -- Для призов за топ и восстановлений (referred_id = referrer_id) - не требуем JOIN
+            (bre.referred_id = bre.referrer_id AND (bre.bookmaker = 'top_payout' OR bre.bookmaker = 'top_payout_restore' OR bre.bookmaker = 'test'))
+          )
       `,
       // Получаем статистику депозитов рефералов за текущий месяц (с 1 числа)
       // ЗАЩИТА ОТ АБУЗА: учитываем только депозиты, сделанные ПОСЛЕ создания реферальной связи
