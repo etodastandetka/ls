@@ -164,31 +164,62 @@ function ReferralWithdrawStep2Content() {
         ok: response.ok
       })
 
+      // Читаем ответ один раз
+      let responseText = ''
+      try {
+        responseText = await response.text()
+      } catch (e) {
+        console.error('❌ Ошибка чтения ответа:', e)
+        throw new Error(`Ошибка чтения ответа сервера: ${response.status}`)
+      }
+
       if (!response.ok) {
         let errorMessage = `Ошибка сервера: ${response.status}`
         try {
-          const errorData = await response.json()
-          if (errorData?.error) {
-            errorMessage = errorData.error
-          } else if (errorData?.message) {
-            errorMessage = errorData.message
+          if (responseText) {
+            const errorData = JSON.parse(responseText)
+            // Проверяем разные форматы ответа API
+            if (errorData?.error) {
+              errorMessage = errorData.error
+            } else if (errorData?.message) {
+              errorMessage = errorData.message
+            } else if (errorData?.data?.error) {
+              errorMessage = errorData.data.error
+            } else if (errorData?.data?.message) {
+              errorMessage = errorData.data.message
+            } else {
+              errorMessage = `Ошибка сервера: ${response.status} ${response.statusText || ''}`
+            }
+          }
+        } catch (parseError) {
+          // Если не удалось распарсить JSON, используем текст или общее сообщение
+          console.error('❌ Не удалось распарсить ошибку как JSON:', parseError)
+          if (responseText && responseText.length < 500 && !responseText.includes('<html') && !responseText.includes('<!DOCTYPE')) {
+            errorMessage = responseText
           } else {
             errorMessage = `Ошибка сервера: ${response.status} ${response.statusText || ''}`
           }
-        } catch (parseError) {
-          // Если не удалось распарсить JSON, используем общее сообщение
-          console.error('❌ Не удалось распарсить ошибку как JSON:', parseError)
-          errorMessage = `Ошибка сервера: ${response.status} ${response.statusText || ''}`
         }
         console.error('❌ Ошибка ответа сервера:', {
           status: response.status,
           statusText: response.statusText,
-          errorMessage
+          errorMessage,
+          responseText: responseText.substring(0, 200)
         })
         throw new Error(errorMessage)
       }
 
-      const data = await response.json()
+      // Парсим успешный ответ
+      let data: any
+      try {
+        if (!responseText) {
+          throw new Error('Пустой ответ от сервера')
+        }
+        data = JSON.parse(responseText)
+      } catch (parseError: any) {
+        console.error('❌ Ошибка парсинга успешного ответа:', parseError)
+        throw new Error('Не удалось обработать ответ сервера')
+      }
       console.log('✅ Данные ответа:', data)
 
       if (data.success) {
