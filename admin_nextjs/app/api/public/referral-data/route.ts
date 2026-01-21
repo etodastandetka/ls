@@ -425,10 +425,10 @@ export async function GET(request: NextRequest) {
         AND r.created_at >= br.created_at
       GROUP BY br.referrer_id
       ORDER BY total_deposits DESC
-      LIMIT 5
+      LIMIT 20
     `
     
-    // Получаем данные пользователей для топ-5
+    // Получаем данные пользователей для топ-20
     const topReferrerIds = topReferrersRaw.map(r => r.referrer_id)
     const topReferrerUsers = await prisma.botUser.findMany({
       where: {
@@ -499,23 +499,22 @@ export async function GET(request: NextRequest) {
       } else if (totalDepositsCurrentMonth === 0) {
         notInTopReason = 'no_deposits' // Рефералы не делали депозиты
       } else {
-        notInTopReason = 'low_amount' // Сумма депозитов меньше, чем у топ-5
+        notInTopReason = 'low_amount' // Сумма депозитов меньше, чем у топ-20
       }
     }
     
-    // Если пользователь не в топ-5, но есть данные, показываем его место
-    const userInTop5 = userRank > 0 && userRank <= 5
+    // Если пользователь не в топ-20, но есть данные, показываем его место
+    const userInTop20 = userRank > 0 && userRank <= 20
     
-    // Настройки призового фонда: 20,000 сом распределены между 5 местами
+    // Настройки призового фонда: топ-20 мест
     const prizeDistribution = [
-      10000, // 1 место
-      5000,  // 2 место
-      2500,  // 3 место
-      1500,  // 4 место
-      1000   // 5 место
+      20000, // 1 место
+      10000, // 2 место
+      5000,  // 3 место
+      ...Array(17).fill(1000) // 4-20 места по 1000 сом
     ]
     
-    // Добавляем призы к топ-5 реферам
+    // Добавляем призы к топ-20 реферам
     const topReferrersWithPrizes = topReferrers.map((ref, index) => ({
       ...ref,
       prize: prizeDistribution[index] || 0
@@ -754,15 +753,17 @@ export async function GET(request: NextRequest) {
       total_deposits_current_month: totalDepositsCurrentMonth, // Сумма депозитов за текущий месяц
       total_deposits_all: totalDepositsAll, // Сумма депозитов за все время
       referrals: referralsList, // Список рефералов пользователя
-      top_players: topReferrersWithPrizes, // Топ-5 реферов
+      top_players: topReferrersWithPrizes, // Топ-20 реферов
       user_rank: userRank > 0 ? userRank : null, // Место в рейтинге (null если не в топе)
-      user_in_top5: userInTop5, // В топ-5 или нет
+      user_in_top20: userInTop20, // В топ-20 или нет
       user_total_deposits: userTotalDeposits, // Сумма всех депозитов рефералов пользователя за текущий месяц
       not_in_top_reason: notInTopReason, // Причина, почему не в топе (если не в топе)
-      // Минимальная сумма для попадания в топ-5 (сумма 5-го места)
-      min_amount_for_top5: topReferrersWithPrizes.length >= 5 
-        ? topReferrersWithPrizes[4].total_deposits 
-        : 0,
+      // Минимальная сумма для попадания в топ-20 (сумма 20-го места)
+      min_amount_for_top20: topReferrersWithPrizes.length >= 20 
+        ? topReferrersWithPrizes[19].total_deposits 
+        : (topReferrersWithPrizes.length > 0 
+          ? topReferrersWithPrizes[topReferrersWithPrizes.length - 1].total_deposits 
+          : 0),
       settings: {
         referral_percentage: 2,
         min_payout: 100,
