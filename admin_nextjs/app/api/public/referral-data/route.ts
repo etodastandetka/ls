@@ -68,12 +68,35 @@ export async function GET(request: NextRequest) {
     // Если только топ, возвращаем только топ игроков
     if (topOnly) {
       try {
-        // Дата начала текущего месяца (с 1 числа текущего месяца)
-        const nowDate = new Date()
-        const currentMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1)
-        currentMonthStart.setHours(0, 0, 0, 0)
+        // Получаем дату начала текущего месяца из конфигурации (21 января - 21 февраля и т.д.)
+        const monthStartConfig = await prisma.botConfiguration.findUnique({
+          where: { key: 'referral_current_month_start' }
+        })
         
-        console.log('📅 [Referral Data API] Фильтрация топ-5 с даты (текущий месяц):', currentMonthStart.toISOString())
+        let monthStartDate: Date | null = null
+        if (monthStartConfig && monthStartConfig.value) {
+          try {
+            const configValue = typeof monthStartConfig.value === 'string' 
+              ? monthStartConfig.value 
+              : JSON.stringify(monthStartConfig.value)
+            monthStartDate = new Date(configValue)
+            console.log('📅 [Referral Data API] Дата начала месяца из конфигурации (top_only):', monthStartDate.toISOString())
+          } catch (e) {
+            console.warn('⚠️ [Referral Data API] Failed to parse referral_current_month_start date:', e)
+          }
+        }
+        
+        // Если дата не установлена, используем начало текущего месяца (fallback)
+        if (!monthStartDate || isNaN(monthStartDate.getTime())) {
+          const nowDate = new Date()
+          monthStartDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1)
+          monthStartDate.setHours(0, 0, 0, 0)
+          console.log('📅 [Referral Data API] Используем начало текущего месяца (по умолчанию, top_only):', monthStartDate.toISOString())
+        }
+        
+        const currentMonthStart = monthStartDate
+        
+        console.log('📅 [Referral Data API] Фильтрация топ-5 с даты:', currentMonthStart.toISOString())
         
         // Получаем топ-5 реферов через агрегацию (только за текущий месяц с 1 числа)
         const topReferrersRaw = await prisma.$queryRaw<Array<{
@@ -231,12 +254,33 @@ export async function GET(request: NextRequest) {
     
     console.log('🔍 [Referral Data API] Поиск рефералов для пользователя:', userIdBigInt.toString())
     
-    // Дата начала текущего месяца (с 1 числа текущего месяца)
-    const now = new Date()
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    currentMonthStart.setHours(0, 0, 0, 0)
+    // Получаем дату начала текущего месяца из конфигурации (21 января - 21 февраля и т.д.)
+    const monthStartConfig = await prisma.botConfiguration.findUnique({
+      where: { key: 'referral_current_month_start' }
+    })
     
-    console.log('📅 [Referral Data API] Текущий месяц начинается с:', currentMonthStart.toISOString())
+    let monthStartDate: Date | null = null
+    if (monthStartConfig && monthStartConfig.value) {
+      try {
+        const configValue = typeof monthStartConfig.value === 'string' 
+          ? monthStartConfig.value 
+          : JSON.stringify(monthStartConfig.value)
+        monthStartDate = new Date(configValue)
+        console.log('📅 [Referral Data API] Дата начала месяца из конфигурации:', monthStartDate.toISOString())
+      } catch (e) {
+        console.warn('⚠️ [Referral Data API] Failed to parse referral_current_month_start date:', e)
+      }
+    }
+    
+    // Если дата не установлена, используем начало текущего месяца (fallback)
+    if (!monthStartDate || isNaN(monthStartDate.getTime())) {
+      const now = new Date()
+      monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1)
+      monthStartDate.setHours(0, 0, 0, 0)
+      console.log('📅 [Referral Data API] Используем начало текущего месяца (по умолчанию):', monthStartDate.toISOString())
+    }
+    
+    const currentMonthStart = monthStartDate
     
     // ОПТИМИЗИРОВАННЫЕ ЗАПРОСЫ: Используем параллельные запросы и агрегацию
     const [referrals, earningsCurrentMonth, earningsAll, statsCurrentMonth, statsAll] = await Promise.all([
