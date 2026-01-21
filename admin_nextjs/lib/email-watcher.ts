@@ -25,6 +25,7 @@ interface WatcherSettings {
   folder: string
   bank: string
   intervalSec: number
+  activeRequisiteId: number | null // ID активного реквизита для отслеживания изменений
 }
 
 // Rate limiting для логов сетевых ошибок
@@ -45,6 +46,7 @@ async function getWatcherSettings(): Promise<WatcherSettings> {
 
   const email = activeRequisite?.email || ''
   const password = activeRequisite?.password || ''
+  const activeRequisiteId = activeRequisite?.id || null
 
   // Получаем только флаг включен/выключен из БД
   const enabledSetting = await prisma.botSetting.findUnique({
@@ -63,6 +65,7 @@ async function getWatcherSettings(): Promise<WatcherSettings> {
     folder: 'INBOX', // Всегда INBOX
     bank: 'DEMIRBANK', // Можно изменить если нужно, но по умолчанию DEMIRBANK
     intervalSec: 60, // Фиксированный интервал 60 секунд
+    activeRequisiteId, // ID активного реквизита для отслеживания изменений
   }
 }
 
@@ -463,6 +466,11 @@ async function checkEmails(settings: WatcherSettings): Promise<void> {
 /**
  * IDLE режим для реального времени (реакция на новые письма мгновенно)
  */
+// Глобальные переменные для отслеживания текущего активного реквизита
+let currentRequisiteId: number | null = null
+let currentEmail: string = ''
+let currentPassword: string = ''
+
 async function startIdleMode(settings: WatcherSettings): Promise<void> {
   return new Promise((resolve, reject) => {
     const imap = new Imap({
@@ -481,6 +489,12 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
 
     let idleInterval: NodeJS.Timeout | null = null
     let keepAliveInterval: NodeJS.Timeout | null = null
+    let checkRequisiteInterval: NodeJS.Timeout | null = null
+
+    // Сохраняем текущие настройки для сравнения
+    currentRequisiteId = settings.activeRequisiteId
+    currentEmail = settings.email
+    currentPassword = settings.password
 
     imap.once('ready', () => {
       console.log(`✅ Connected to IMAP (${settings.email})`)
@@ -635,6 +649,54 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
             imap.end()
           }
         }, 29 * 60 * 1000)
+
+        // Проверка изменения активного реквизита: каждые 30 секунд
+        checkRequisiteInterval = setInterval(async () => {
+          try {
+            const newSettings = await getWatcherSettings()
+            
+            // Проверяем, изменился ли активный реквизит
+            const requisiteChanged = 
+              newSettings.activeRequisiteId !== currentRequisiteId ||
+              newSettings.email !== currentEmail ||
+              newSettings.password !== currentPassword
+
+            if (requisiteChanged) {
+              console.log('🔄 Active requisite changed! Reconnecting...')
+              console.log(`   Old: ID ${currentRequisiteId}, Email: ${currentEmail ? currentEmail.substring(0, 10) + '...' : 'none'}`)
+              console.log(`   New: ID ${newSettings.activeRequisiteId}, Email: ${newSettings.email ? newSettings.email.substring(0, 10) + '...' : 'none'}`)
+              
+              // Закрываем интервалы
+              if (idleInterval) {
+                clearInterval(idleInterval)
+                idleInterval = null
+              }
+              if (keepAliveInterval) {
+                clearInterval(keepAliveInterval)
+                keepAliveInterval = null
+              }
+              if (checkRequisiteInterval) {
+                clearInterval(checkRequisiteInterval)
+                checkRequisiteInterval = null
+              }
+              
+              // Закрываем соединение
+              try {
+                imap.end()
+              } catch (e) {
+                // Игнорируем ошибки при закрытии
+              }
+              
+              // Выбрасываем специальную ошибку для переподключения
+              const reconnectError = new Error('REQUISITE_CHANGED') as any
+              reconnectError.code = 'REQUISITE_CHANGED'
+              reject(reconnectError)
+            }
+          } catch (error: any) {
+            // Игнорируем ошибки проверки, чтобы не прерывать работу
+            console.warn('⚠️ Error checking active requisite:', error.message)
+          }
+        }, 30000) // Проверка каждые 30 секунд
       })
     })
 
@@ -670,6 +732,10 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
               clearInterval(keepAliveInterval)
               keepAliveInterval = null
             }
+            if (checkRequisiteInterval) {
+              clearInterval(checkRequisiteInterval)
+              checkRequisiteInterval = null
+            }
             imap.end()
           } catch (e) {
             // Игнорируем ошибки
@@ -695,6 +761,10 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
             clearInterval(keepAliveInterval)
             keepAliveInterval = null
           }
+          if (checkRequisiteInterval) {
+            clearInterval(checkRequisiteInterval)
+            checkRequisiteInterval = null
+          }
           imap.end()
         } catch (e) {
           // Игнорируем ошибки при закрытии
@@ -708,6 +778,7 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
         consecutiveNetworkErrors = 0 // Сбрасываем при других ошибках
         if (idleInterval) clearInterval(idleInterval)
         if (keepAliveInterval) clearInterval(keepAliveInterval)
+        if (checkRequisiteInterval) clearInterval(checkRequisiteInterval)
         reject(err)
       }
     })
@@ -720,6 +791,10 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
       if (keepAliveInterval) {
         clearInterval(keepAliveInterval)
         keepAliveInterval = null
+      }
+      if (checkRequisiteInterval) {
+        clearInterval(checkRequisiteInterval)
+        checkRequisiteInterval = null
       }
       // Только логируем если это не было вызвано сетевой ошибкой (она уже залогировала)
       if (consecutiveNetworkErrors === 0) {
@@ -824,6 +899,13 @@ export async function startWatcher(): Promise<void> {
         // Сбрасываем счетчик при успешном подключении
         consecutiveNetworkErrors = 0
       } catch (error: any) {
+        // Проверяем, изменился ли активный реквизит
+        if (error.code === 'REQUISITE_CHANGED') {
+          console.log('🔄 Active requisite changed, reconnecting with new credentials...')
+          // Небольшая задержка перед переподключением
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+          continue // Продолжаем цикл, чтобы переподключиться с новыми настройками
+        }
         if (error.textCode === 'AUTHENTICATIONFAILED') {
           console.error('❌ IMAP Authentication Failed!')
           console.error('   Please check email and password in the active requisite')
