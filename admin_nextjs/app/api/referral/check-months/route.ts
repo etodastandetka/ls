@@ -58,9 +58,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 3. Получаем топ-5 игроков за период с 21 декабря 2024 до 21 января 2025
-    const periodStart = new Date('2024-12-21T00:00:00.000Z')
-    const periodEnd = new Date('2025-01-21T00:00:00.000Z')
+    // 3. Получаем топ-5 игроков за период с 21 декабря 2025 до 21 января 2026
+    const periodStart = new Date('2025-12-21T00:00:00.000Z')
+    const periodEnd = new Date('2026-01-21T00:00:00.000Z')
 
     const topReferrersRaw = await prisma.$queryRaw<Array<{
       referrer_id: bigint,
@@ -183,7 +183,21 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(createApiResponse(result))
+    // Формируем удобный список для начисления баланса
+    const payoutList = result.topPlayersForPeriod
+      .filter((player: any) => !player.prizeAlreadyPaid)
+      .map((player: any) => ({
+        userId: player.userId,
+        displayName: player.displayName,
+        rank: player.rank,
+        prize: player.prize,
+        command: `tsx scripts/add-referral-balance.ts ${player.userId} ${player.prize}`
+      }))
+
+    return NextResponse.json(createApiResponse({
+      ...result,
+      payoutList // Список для начисления баланса
+    }))
 
   } catch (error: any) {
     console.error('Check months error:', error)
