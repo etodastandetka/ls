@@ -165,13 +165,27 @@ function ReferralWithdrawStep2Content() {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
+        let errorMessage = `Ошибка сервера: ${response.status}`
+        try {
+          const errorData = await response.json()
+          if (errorData?.error) {
+            errorMessage = errorData.error
+          } else if (errorData?.message) {
+            errorMessage = errorData.message
+          } else {
+            errorMessage = `Ошибка сервера: ${response.status} ${response.statusText || ''}`
+          }
+        } catch (parseError) {
+          // Если не удалось распарсить JSON, используем общее сообщение
+          console.error('❌ Не удалось распарсить ошибку как JSON:', parseError)
+          errorMessage = `Ошибка сервера: ${response.status} ${response.statusText || ''}`
+        }
         console.error('❌ Ошибка ответа сервера:', {
           status: response.status,
           statusText: response.statusText,
-          errorText
+          errorMessage
         })
-        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`)
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
