@@ -91,6 +91,25 @@ async function restoreTopPrizes() {
       console.log(`   Призы за топ: ${totalPrizeAmount.toFixed(2)} сом`)
       console.log(`   Вычеты month_close: ${totalDeduction.toFixed(2)} сом`)
       
+      // Проверяем, были ли выведены средства после вычета призов
+      const withdrawals = await prisma.referralWithdrawalRequest.findMany({
+        where: {
+          userId: userId,
+          status: 'completed'
+        },
+        select: {
+          amount: true,
+          createdAt: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      })
+      
+      const totalWithdrawn = withdrawals.reduce((sum, w) => {
+        return sum + parseFloat(w.amount.toString())
+      }, 0)
+      
       // Если вычеты больше или равны призам, возможно призы были вычтены
       // Восстанавливаем баланс, создавая положительную запись
       if (totalDeduction >= totalPrizeAmount * 0.9) { // 90% совпадение (с учетом возможных округлений)
@@ -110,6 +129,27 @@ async function restoreTopPrizes() {
           continue
         }
         
+        // Проверяем текущий баланс
+        const allEarnings = await prisma.botReferralEarning.findMany({
+          where: {
+            referrerId: userId,
+            status: 'completed'
+          },
+          select: {
+            commissionAmount: true
+          }
+        })
+        
+        const currentEarned = allEarnings.reduce((sum, e) => {
+          return sum + parseFloat(e.commissionAmount.toString())
+        }, 0)
+        
+        const currentAvailable = currentEarned - totalWithdrawn
+        
+        console.log(`   💰 Текущий баланс: ${currentEarned.toFixed(2)} сом`)
+        console.log(`   💸 Выведено: ${totalWithdrawn.toFixed(2)} сом`)
+        console.log(`   💵 Доступно: ${currentAvailable.toFixed(2)} сом`)
+        
         // Создаем запись о восстановлении баланса
         await prisma.botReferralEarning.create({
           data: {
@@ -125,7 +165,13 @@ async function restoreTopPrizes() {
         restoredCount++
         totalRestored += restoreAmount
         
+        const newAvailable = currentEarned + restoreAmount - totalWithdrawn
         console.log(`   ✅ Баланс восстановлен: ${restoreAmount.toFixed(2)} сом`)
+        console.log(`   💵 Новый доступный баланс: ${newAvailable.toFixed(2)} сом`)
+        
+        if (totalWithdrawn > 0) {
+          console.log(`   ⚠️  Внимание: пользователь уже вывел ${totalWithdrawn.toFixed(2)} сом`)
+        }
       } else {
         console.log(`   ℹ️  Вычеты меньше призов, возможно призы не были вычтены`)
       }
