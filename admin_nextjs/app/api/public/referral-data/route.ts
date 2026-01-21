@@ -308,8 +308,13 @@ export async function GET(request: NextRequest) {
             -- Для обычных заработков - проверяем дату создания реферальной связи
             (bre.referred_id != bre.referrer_id AND bre.created_at >= br.created_at)
             OR
-            -- Для призов за топ и восстановлений (referred_id = referrer_id) - не требуем JOIN
-            (bre.referred_id = bre.referrer_id AND (bre.bookmaker = 'top_payout' OR bre.bookmaker = 'top_payout_restore' OR bre.bookmaker = 'test'))
+            -- Для призов за топ, восстановлений и вычетов за абуз (referred_id = referrer_id) - не требуем JOIN
+            (bre.referred_id = bre.referrer_id AND (
+              bre.bookmaker = 'top_payout' 
+              OR bre.bookmaker = 'top_payout_restore' 
+              OR bre.bookmaker = 'test'
+              OR bre.bookmaker LIKE 'abuse_deduction%'
+            ))
           )
       `,
       // Получаем ВСЕ заработанные комиссии (для расчета доступного баланса - накопленные за все время)
@@ -327,8 +332,13 @@ export async function GET(request: NextRequest) {
             -- Для обычных заработков - проверяем дату создания реферальной связи
             (bre.referred_id != bre.referrer_id AND bre.created_at >= br.created_at)
             OR
-            -- Для призов за топ и восстановлений (referred_id = referrer_id) - не требуем JOIN
-            (bre.referred_id = bre.referrer_id AND (bre.bookmaker = 'top_payout' OR bre.bookmaker = 'top_payout_restore' OR bre.bookmaker = 'test'))
+            -- Для призов за топ, восстановлений и вычетов за абуз (referred_id = referrer_id) - не требуем JOIN
+            (bre.referred_id = bre.referrer_id AND (
+              bre.bookmaker = 'top_payout' 
+              OR bre.bookmaker = 'top_payout_restore' 
+              OR bre.bookmaker = 'test'
+              OR bre.bookmaker LIKE 'abuse_deduction%'
+            ))
           )
       `,
       // Получаем статистику депозитов рефералов за текущий месяц (с 1 числа)
