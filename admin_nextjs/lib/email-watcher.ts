@@ -498,11 +498,46 @@ async function startIdleMode(settings: WatcherSettings): Promise<void> {
 
         // Слушаем события о новых письмах
         imap.on('mail', async () => {
-          console.log('📬 New email detected! Processing...')
+          console.log('📬 New email detected! Processing immediately...')
           try {
-            await checkEmails(settings)
-            // Сбрасываем счетчик при успешной обработке
-            consecutiveNetworkErrors = 0
+            // ОПТИМИЗАЦИЯ: При событии mail сразу обрабатываем новые письма без задержки
+            // Используем быстрый поиск только самых свежих писем (за последние 2 минуты)
+            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
+            const searchCriteria = ['UNSEEN', ['SINCE', twoMinutesAgo]]
+            
+            imap.search(searchCriteria, async (err: Error | null, results?: number[]) => {
+              if (err) {
+                console.error(`❌ Error searching for new emails:`, err)
+                // Fallback: используем обычный метод
+                try {
+                  await checkEmails(settings)
+                } catch (fallbackError: any) {
+                  console.error('❌ Fallback checkEmails also failed:', fallbackError.message)
+                }
+                return
+              }
+
+              if (!results || results.length === 0) {
+                console.log('📭 No new unread emails found (in last 2 minutes)')
+                consecutiveNetworkErrors = 0
+                return
+              }
+
+              console.log(`📬 Found ${results.length} new unread email(s) - processing immediately...`)
+
+              // Обрабатываем каждое письмо последовательно
+              for (const uid of results) {
+                try {
+                  await processEmail(imap, uid, settings)
+                } catch (error: any) {
+                  console.error(`❌ Error processing email UID ${uid}:`, error.message)
+                  // Продолжаем обработку остальных писем даже при ошибке
+                }
+              }
+
+              console.log(`✅ Finished processing ${results.length} new email(s)`)
+              consecutiveNetworkErrors = 0
+            })
           } catch (error: any) {
             // Обрабатываем сетевые ошибки с rate limiting
             if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
