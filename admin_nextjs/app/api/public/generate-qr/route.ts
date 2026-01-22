@@ -321,7 +321,15 @@ export async function POST(request: NextRequest) {
         return errorResponse
       }
       
+      // Проверяем, что поле 63 действительно находится после всех полей 54
+      const lastField54Index = field54Matches[field54Matches.length - 1].index
+      if (originalLast63Index <= lastField54Index) {
+        console.warn(`⚠️ Field 63 (index ${originalLast63Index}) is before last field 54 (index ${lastField54Index})`)
+      }
+      
       console.log(`🔍 Field 63 found at index ${originalLast63Index}`)
+      console.log(`🔍 Last field 54 at index ${lastField54Index}, field 63 at index ${originalLast63Index}`)
+      console.log(`🔍 Requisite structure: ...${requisite.substring(Math.max(0, lastField54Index - 10), originalLast63Index + 20)}...`)
       
       // Находим последнее поле 54 перед полем 63
       const lastField54Before63 = field54Matches
@@ -338,28 +346,72 @@ export async function POST(request: NextRequest) {
       }
       
       console.log(`🔍 Last field 54 before 63: "${lastField54Before63.fullMatch}" at index ${lastField54Before63.index}`)
+      console.log(`🔍 Requisite before update: ${requisite.substring(0, 50)}...${requisite.slice(-30)}`)
       
       // Заменяем последнее поле 54 на новое значение
       const oldField54 = lastField54Before63.fullMatch
       const newField54 = `54${amountLen}${amountStr}`
       
       console.log(`💰 Updating field 54: "${oldField54}" -> "${newField54}" (amount: ${amount}, cents: ${amountCents})`)
+      console.log(`🔍 Old field 54 length: ${oldField54.length}, new field 54 length: ${newField54.length}`)
       
       // Заменяем последнее вхождение поля 54 (перед полем 63)
-      let updatedHash = requisite.substring(0, lastField54Before63.index) + 
-                       newField54 + 
-                       requisite.substring(lastField54Before63.index + oldField54.length)
+      const before54 = requisite.substring(0, lastField54Before63.index)
+      const after54 = requisite.substring(lastField54Before63.index + oldField54.length)
+      let updatedHash = before54 + newField54 + after54
+      
+      console.log(`🔍 Replacement details:`)
+      console.log(`   Before 54: ...${before54.slice(-20)}`)
+      console.log(`   New 54: ${newField54}`)
+      console.log(`   After 54: ${after54.substring(0, 30)}...`)
       
       // 🔐 КРИТИЧНО: Пересчитываем индекс поля 63 после замены поля 54
       // Длина нового поля 54 может отличаться от старого, поэтому индекс 63 может сместиться
       const lengthDiff = newField54.length - oldField54.length
-      const newLast63Index = originalLast63Index + lengthDiff
+      const calculatedNew63Index = originalLast63Index + lengthDiff
       
       console.log(`🔍 Field 54 length change: ${oldField54.length} -> ${newField54.length} (diff: ${lengthDiff})`)
-      console.log(`🔍 Field 63 index: ${originalLast63Index} -> ${newLast63Index}`)
+      console.log(`🔍 Field 63 calculated index: ${originalLast63Index} -> ${calculatedNew63Index}`)
+      console.log(`🔍 Updated hash preview: ${updatedHash.substring(0, 50)}...${updatedHash.slice(-30)}`)
       
-      // Проверяем, что поле 63 все еще существует после замены
-      if (updatedHash.substring(newLast63Index, newLast63Index + 4) !== '6304') {
+      // 🔐 КРИТИЧНО: Находим поле 63 в обновленном hash заново (не полагаемся только на расчет)
+      // Ищем последнее вхождение "6304" в обновленном hash
+      let newLast63Index = updatedHash.lastIndexOf('6304')
+      
+      // Если не нашли по последнему вхождению, пробуем найти по расчетному индексу
+      if (newLast63Index === -1) {
+        console.warn(`⚠️ Field 63 not found at last index, trying calculated index ${calculatedNew63Index}`)
+        if (calculatedNew63Index >= 0 && calculatedNew63Index < updatedHash.length && 
+            updatedHash.substring(calculatedNew63Index, calculatedNew63Index + 4) === '6304') {
+          newLast63Index = calculatedNew63Index
+          console.log(`✅ Field 63 found at calculated index ${newLast63Index}`)
+        } else {
+          // Пробуем найти любое вхождение 6304 после замены поля 54
+          const all63Matches: number[] = []
+          let searchIndex = 0
+          while ((searchIndex = updatedHash.indexOf('6304', searchIndex)) !== -1) {
+            all63Matches.push(searchIndex)
+            searchIndex += 4
+          }
+          console.log(`🔍 All 6304 matches found: ${all63Matches.join(', ')}`)
+          
+          if (all63Matches.length === 0) {
+            const errorResponse = NextResponse.json(
+              { success: false, error: 'Ошибка: поле 63 не найдено после замены поля 54' },
+              { status: 500 }
+            )
+            errorResponse.headers.set('Access-Control-Allow-Origin', '*')
+            return errorResponse
+          }
+          
+          // Используем последнее вхождение
+          newLast63Index = all63Matches[all63Matches.length - 1]
+          console.log(`✅ Using last 6304 match at index ${newLast63Index}`)
+        }
+      }
+      
+      // Проверяем, что поле 63 найдено и валидно
+      if (newLast63Index === -1 || updatedHash.substring(newLast63Index, newLast63Index + 4) !== '6304') {
         const errorResponse = NextResponse.json(
           { success: false, error: 'Ошибка: поле 63 не найдено после замены поля 54' },
           { status: 500 }
@@ -367,6 +419,8 @@ export async function POST(request: NextRequest) {
         errorResponse.headers.set('Access-Control-Allow-Origin', '*')
         return errorResponse
       }
+      
+      console.log(`✅ Field 63 confirmed at index ${newLast63Index} in updated hash`)
       
       // 🔐 КРИТИЧНО: Находим длину старого поля 63 (обычно 8 символов: 6304 + 4 hex)
       // Извлекаем старое поле 63 из исходного requisite для определения его длины
