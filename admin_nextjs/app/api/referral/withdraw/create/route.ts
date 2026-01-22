@@ -22,7 +22,16 @@ export async function POST(request: NextRequest) {
     const accountId = body.account_id || body.accountId || ''
     const amount = parseFloat(body.amount || 0)
     
+    console.log('📋 [Referral Withdraw Create] Request data:', {
+      userId: userId ? String(userId).substring(0, 10) + '...' : 'null',
+      bookmaker,
+      accountId: accountId ? accountId.substring(0, 5) + '...' : 'null',
+      amount,
+      hasTelegramData: !!body.telegram_data
+    })
+    
     if (!userId) {
+      console.error('❌ [Referral Withdraw Create] User ID is missing')
       const errorResponse = NextResponse.json({
         success: false,
         error: 'User ID is required'
