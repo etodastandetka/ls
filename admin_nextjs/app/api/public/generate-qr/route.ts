@@ -368,6 +368,16 @@ export async function POST(request: NextRequest) {
         return errorResponse
       }
       
+      // 🔐 КРИТИЧНО: Находим длину старого поля 63 (обычно 8 символов: 6304 + 4 hex)
+      // Извлекаем старое поле 63 из исходного requisite для определения его длины
+      const oldField63Match = requisite.substring(originalLast63Index).match(/^6304([0-9A-Fa-f]{4})/)
+      const oldField63Length = oldField63Match ? oldField63Match[0].length : 8 // По умолчанию 8 символов
+      
+      // Сохраняем все что было после старого поля 63 в исходном requisite
+      const dataAfterOld63 = requisite.substring(originalLast63Index + oldField63Length)
+      
+      console.log(`🔍 Old field 63 length: ${oldField63Length}, data after: "${dataAfterOld63.substring(0, 20)}..."`)
+      
       // Извлекаем данные до последнего объекта 63 (ID "00" - "90", исключая ID 63)
       // ВАЖНО: Используем новый индекс после замены поля 54
       let dataBefore63 = updatedHash.substring(0, newLast63Index)
@@ -385,45 +395,70 @@ export async function POST(request: NextRequest) {
       console.log(`🔍 Data before field 63 length: ${dataBefore63.length} chars`)
       console.log(`✅ Проверка: сумма (${newField54}) включена в данные для hash`)
       
-      // Согласно алгоритму:
-      // 1. Все значения до объекта 63 преобразуются в строку (уже есть)
-      // 2. Декодируем процентное кодирование (%20 -> пробел и т.д.)
-      // 3. Строка переводится в массив байт с кодировкой UTF-8
-      // 4. Вычисляется SHA256 хеш от массива байт (ВКЛЮЧАЯ СУММУ в поле 54)
-      // 5. Массив байт преобразуется в строку (hex)
-      // 6. Удаляются все символы "-" если есть
-      // 7. Берутся последние 4 символа
+      // 🔐 АЛГОРИТМ ФОРМИРОВАНИЯ КОНТРОЛЬНОЙ СУММЫ (поле 63):
+      // 1. Все значения деталей платежа до объекта 63 (ID "00" - "90", исключая ID 63) 
+      //    преобразуются в одну строку (уже есть в dataBefore63)
+      // 2. Строка данных переводится в массив байт с кодировкой UTF-8
+      // 3. Вычисляется хеш массива, используя алгоритм SHA256
+      // 4. Массив байт преобразуется в строку (hex)
+      // 5. Удаляются все символы "-", если они есть
+      // 6. Из строки берутся последние 4 символа
       
-      // Декодируем процентное кодирование (%20 -> пробел и т.д.)
+      // Шаг 2: Декодируем процентное кодирование (%20 -> пробел и т.д.)
+      // ВАЖНО: Процентное кодирование используется для символов, выходящих за пределы ASCII
+      // Символы, которые НЕ кодируются: ":", "/", "?", "#", "[", "]", "@", "!", "$", "&", 
+      // "'", " ", "(", ")", "*", "+", ",", ";", "=", ALPHA, DIGIT, HEXDIG, "-", ".", "_", "~"
+      let decodedDataBefore63: string
       try {
-        dataBefore63 = decodeURIComponent(dataBefore63)
-      } catch (e) {
-        // Если декодирование не удалось, используем исходную строку
-        console.warn('⚠️ Could not decode URI component, using original string')
+        // Декодируем процентное кодирование (например, %20 -> пробел)
+        decodedDataBefore63 = decodeURIComponent(dataBefore63)
+        console.log(`🔍 Percent-encoded data decoded: ${dataBefore63.length} -> ${decodedDataBefore63.length} chars`)
+      } catch (e: any) {
+        // Если декодирование не удалось (невалидные последовательности), используем исходную строку
+        console.warn(`⚠️ Could not decode URI component: ${e?.message}, using original string`)
+        decodedDataBefore63 = dataBefore63
       }
       
-      // 🔐 Вычисляем SHA256 от данных до объекта 63 (ВКЛЮЧАЯ СУММУ в поле 54)
-      // createHash('sha256').update() уже работает с UTF-8 байтами по умолчанию
-      // Сумма уже включена в dataBefore63 через поле 54, поэтому hash защищает от изменения суммы
-      const checksumFull = createHash('sha256').update(dataBefore63, 'utf8').digest('hex')
+      // Шаг 3: Вычисляем SHA256 хеш от массива байт UTF-8
+      // createHash('sha256').update() автоматически конвертирует строку в UTF-8 байты
+      // Сумма уже включена в decodedDataBefore63 через поле 54, поэтому hash защищает от изменения суммы
+      const checksumFull = createHash('sha256').update(decodedDataBefore63, 'utf8').digest('hex')
       
-      // Удаляем все символы "-" если есть (хотя в hex их обычно нет)
+      // Шаг 4: Массив байт уже преобразован в строку (hex) через .digest('hex')
+      // Шаг 5: Удаляем все символы "-" если есть (хотя в hex их обычно нет)
       const checksumCleaned = checksumFull.replace(/-/g, '')
       
-      // Берем последние 4 символа в верхнем регистре
+      // Шаг 6: Из строки берутся последние 4 символа (в верхнем регистре для hex)
       const checksum = checksumCleaned.slice(-4).toUpperCase()
       
-      console.log(`🔐 SHA-256 checksum calculated: ${checksumFull.substring(0, 20)}...${checksumFull.slice(-4)} (last 4: ${checksum})`)
+      console.log(`🔐 SHA-256 checksum calculated:`)
+      console.log(`   Full hash: ${checksumFull.substring(0, 20)}...${checksumFull.slice(-4)}`)
+      console.log(`   After removing "-": ${checksumCleaned.substring(0, 20)}...${checksumCleaned.slice(-4)}`)
+      console.log(`   Last 4 chars (checksum): ${checksum}`)
       
       // Заменяем последнее поле 63 (контрольная сумма) - формат: 6304 + 4 символа hex
+      // Формат поля 63: ID "63" + длина "04" + значение (4 hex символа: буквы A-F и цифры 0-9)
       // ВАЖНО: Используем новый индекс после замены поля 54
+      // 🔐 КРИТИЧНО: Сохраняем все что было после старого поля 63
       const newField63 = `6304${checksum}`
-      qrHash = updatedHash.substring(0, newLast63Index) + newField63
+      
+      // Проверяем, что checksum содержит только hex символы (0-9, A-F)
+      if (!/^[0-9A-F]{4}$/.test(checksum)) {
+        const errorResponse = NextResponse.json(
+          { success: false, error: `Ошибка: невалидный checksum для поля 63: ${checksum}` },
+          { status: 500 }
+        )
+        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
+        return errorResponse
+      }
+      
+      qrHash = updatedHash.substring(0, newLast63Index) + newField63 + dataAfterOld63
       
       console.log(`✅ BAKAI QR hash generated successfully`)
-      console.log(`   Old field 63: ${requisite.substring(originalLast63Index, originalLast63Index + 8)}`)
-      console.log(`   New field 63: ${newField63}`)
-      console.log(`   Final hash preview: ${qrHash.substring(0, 30)}...${qrHash.slice(-15)}`)
+      console.log(`   Old field 63: ${requisite.substring(originalLast63Index, originalLast63Index + oldField63Length)}`)
+      console.log(`   New field 63: ${newField63} (ID: 63, Length: 04, Value: ${checksum})`)
+      console.log(`   Data after field 63: "${dataAfterOld63.substring(0, 20)}${dataAfterOld63.length > 20 ? '...' : ''}"`)
+      console.log(`   Final hash preview: ${qrHash.substring(0, 50)}...${qrHash.slice(-20)}`)
     } else {
       // Для Demir Bank используем существующую логику
       // Проверяем, что реквизит - это 16 цифр
