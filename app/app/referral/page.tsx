@@ -698,7 +698,7 @@ export default function ReferralPage() {
         </section>
       )}
 
-      {/* Список рефералов с заработком */}
+      {/* Список рефералов - показываем всех, даже без депозитов */}
       {referralsList.length > 0 && (
         <section className="card space-y-4 border-white/10 bg-gradient-to-br from-green-500/10 via-white/5 to-emerald-500/10">
           <div className="flex items-center space-x-2">
@@ -709,34 +709,47 @@ export default function ReferralPage() {
           </div>
           
           <div className="space-y-3">
-            {referralsList.map((ref: any) => (
-              <div key={ref.referred_id} className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-green-500/10 to-emerald-500/5 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold">
-                      {ref.displayName?.charAt(0)?.toUpperCase() || '?'}
+            {referralsList.map((ref: any) => {
+              const hasDeposits = (ref.deposits_count || 0) > 0
+              return (
+                <div key={ref.referred_id} className={`rounded-2xl border ${hasDeposits ? 'border-emerald-500/20' : 'border-gray-500/20'} bg-gradient-to-br ${hasDeposits ? 'from-green-500/10 to-emerald-500/5' : 'from-gray-500/5 to-gray-600/5'} p-4`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${hasDeposits ? 'bg-gradient-to-br from-green-400 to-emerald-500' : 'bg-gradient-to-br from-gray-400 to-gray-500'}`}>
+                        {ref.displayName?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div>
+                        <div className="text-white font-semibold text-base">{ref.displayName}</div>
+                        <div className="text-xs text-white/60">
+                          {hasDeposits ? (
+                            <>
+                              {ref.deposits_count || 0} депозит{ref.deposits_count !== 1 ? 'ов' : ''}
+                            </>
+                          ) : (
+                            <span className="text-white/40">Ожидает первого депозита</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/10">
+                    <div>
+                      <div className="text-xs text-white/60 mb-1">Сумма депозитов</div>
+                      <div className={`font-bold ${hasDeposits ? 'text-emerald-300' : 'text-white/40'}`}>
+                        {ref.total_deposits?.toLocaleString() || 0} сом
+                      </div>
                     </div>
                     <div>
-                      <div className="text-white font-semibold text-base">{ref.displayName}</div>
-                      <div className="text-xs text-white/60">
-                        {ref.deposits_count || 0} депозит{ref.deposits_count !== 1 ? 'ов' : ''}
+                      <div className="text-xs text-white/60 mb-1">Ваш заработок (2%)</div>
+                      <div className={`font-bold ${hasDeposits ? 'text-green-300' : 'text-white/40'}`}>
+                        {ref.total_earnings?.toLocaleString() || 0} сом
                       </div>
                     </div>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/10">
-                  <div>
-                    <div className="text-xs text-white/60 mb-1">Сумма депозитов</div>
-                    <div className="text-emerald-300 font-bold">{ref.total_deposits?.toLocaleString() || 0} сом</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-white/60 mb-1">Ваш заработок (2%)</div>
-                    <div className="text-green-300 font-bold">{ref.total_earnings?.toLocaleString() || 0} сом</div>
-                  </div>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}
