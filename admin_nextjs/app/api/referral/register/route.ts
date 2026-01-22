@@ -200,6 +200,7 @@ export async function POST(request: NextRequest) {
     
     // Если реферала нет в БД, создаем его
     if (!referred) {
+      console.log(`📝 [Referral Register] Создание нового пользователя ${referredIdBigInt}`)
       referred = await prisma.botUser.create({
         data: {
           userId: referredIdBigInt,
@@ -209,7 +210,13 @@ export async function POST(request: NextRequest) {
           language: 'ru'
         }
       })
+      console.log(`✅ [Referral Register] Пользователь ${referredIdBigInt} создан:`, {
+        username: referred.username,
+        firstName: referred.firstName,
+        lastName: referred.lastName
+      })
     } else {
+      console.log(`ℹ️ [Referral Register] Пользователь ${referredIdBigInt} уже существует`)
       // Обновляем данные пользователя, если они есть
       if (username || firstName || lastName) {
         await prisma.botUser.update({
@@ -220,10 +227,12 @@ export async function POST(request: NextRequest) {
             lastName: lastName || referred.lastName
           }
         })
+        console.log(`🔄 [Referral Register] Данные пользователя ${referredIdBigInt} обновлены`)
       }
     }
     
     // Создаем реферальную связь
+    console.log(`🔄 [Referral Register] Создание реферальной связи: ${referrerIdBigInt} -> ${referredIdBigInt}`)
     const referral = await prisma.botReferral.create({
       data: {
         referrerId: referrerIdBigInt,
@@ -231,11 +240,32 @@ export async function POST(request: NextRequest) {
       }
     })
     
+    // Проверяем, что связь действительно создана
+    const verifyReferral = await prisma.botReferral.findUnique({
+      where: {
+        referredId: referredIdBigInt
+      },
+      include: {
+        referred: {
+          select: {
+            userId: true,
+            username: true,
+            firstName: true
+          }
+        }
+      }
+    })
+    
     console.log('✅ [Referral Register] Реферальная связь успешно создана:', {
       referral_id: referral.id,
       referrer_id: referrerIdBigInt.toString(),
       referred_id: referredIdBigInt.toString(),
-      created_at: referral.createdAt.toISOString()
+      created_at: referral.createdAt.toISOString(),
+      verified: verifyReferral ? 'yes' : 'no',
+      referred_user: verifyReferral?.referred ? {
+        userId: verifyReferral.referred.userId.toString(),
+        username: verifyReferral.referred.username
+      } : 'null'
     })
     
     const response = NextResponse.json({

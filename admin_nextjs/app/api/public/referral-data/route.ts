@@ -622,9 +622,19 @@ export async function GET(request: NextRequest) {
       }
     })
     
+    console.log(`📊 [Referral Data API] Найдено рефералов в БД для пользователя ${userIdBigInt}: ${userReferrals.length}`)
+    if (userReferrals.length > 0) {
+      console.log(`📋 [Referral Data API] Первые 3 реферала:`, userReferrals.slice(0, 3).map(ref => ({
+        referred_id: ref.referredId.toString(),
+        username: ref.referred?.username || null,
+        created_at: ref.createdAt.toISOString()
+      })))
+    }
+    
     // Для каждого реферала получаем статистику депозитов и заработка
     const referralsList = await Promise.all(
       userReferrals.map(async (ref) => {
+        console.log(`🔍 [Referral Data API] Обработка реферала ${ref.referredId.toString()}, username: ${ref.referred?.username || 'null'}`)
         // ЗАЩИТА ОТ АБУЗА: учитываем только депозиты, сделанные ПОСЛЕ создания реферальной связи
         const referralCreatedAt = ref.createdAt
         
@@ -718,7 +728,7 @@ export async function GET(request: NextRequest) {
         const earningsCount = earningsStatsAll._count.id || 0
         const earningsCountCurrentMonth = earningsStatsCurrentMonth._count.id || 0
         
-        return {
+        const referralData = {
           referred_id: ref.referredId.toString(),
           referred_username: ref.referred?.username || null,
           referred_firstName: ref.referred?.firstName || null,
@@ -738,6 +748,14 @@ export async function GET(request: NextRequest) {
           earnings_count: earningsCount, // Количество заработков (все время)
           earnings_count_current_month: earningsCountCurrentMonth // Количество заработков за текущий месяц
         }
+        
+        console.log(`✅ [Referral Data API] Данные реферала ${ref.referredId.toString()}:`, {
+          displayName: referralData.displayName,
+          deposits_count: depositsCount,
+          total_deposits: totalDeposits
+        })
+        
+        return referralData
       })
     )
     
@@ -781,7 +799,13 @@ export async function GET(request: NextRequest) {
       earned: responseData.earned,
       total_referrals: responseData.total_referrals,
       referral_count: responseData.referral_count,
-      user_rank: responseData.user_rank
+      user_rank: responseData.user_rank,
+      referrals_list_length: referralsList.length,
+      referrals_list: referralsList.slice(0, 3).map(r => ({
+        id: r.referred_id,
+        name: r.displayName,
+        deposits: r.deposits_count
+      }))
     })
     
     const response = NextResponse.json(responseData)
