@@ -609,46 +609,71 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Продолжаем выполнение, если ошибка
     
     # Обработка реферальной ссылки
-    referral_code = None
-    if update.message and update.message.text:
+    # Пробуем получить параметр из context.args (предпочтительный способ)
+    param = None
+    if context.args and len(context.args) > 0:
+        param = context.args[0]
+        logger.info(f"📋 Получен параметр из context.args: {param}")
+    elif update.message and update.message.text:
+        # Fallback: получаем из текста сообщения
         parts = update.message.text.split()
         if len(parts) > 1:
             param = parts[1]
-            # Обрабатываем формат ref123456 или ref_123456
-            if param.startswith('ref'):
-                referral_code = param[3:]  # Убираем 'ref'
-                if referral_code.startswith('_'):
-                    referral_code = referral_code[1:]  # Убираем '_' если есть
-                
-                # Пытаемся извлечь ID рефера
-                try:
-                    referrer_id = int(referral_code)
-                    if referrer_id != user_id:
-                        # Регистрируем реферальную связь через API
-                        try:
-                            async with httpx.AsyncClient(timeout=5.0) as client:
-                                response = await client.post(
-                                    f"{API_URL}/api/referral/register",
-                                    json={
-                                        "referrer_id": str(referrer_id),
-                                        "referred_id": str(user_id),
-                                        "username": user.username,
-                                        "first_name": user.first_name,
-                                        "last_name": user.last_name
-                                    }
-                                )
-                                if response.status_code == 200:
-                                    data = response.json()
-                                    if data.get('success'):
-                                        logger.info(f"✅ Реферальная связь зарегистрирована: {referrer_id} -> {user_id}")
-                                    else:
-                                        logger.warning(f"⚠️ Не удалось зарегистрировать реферала: {data.get('error')}")
+            logger.info(f"📋 Получен параметр из message.text: {param}")
+    
+    if param:
+        # Обрабатываем формат ref123456 или ref_123456
+        if param.startswith('ref'):
+            referral_code = param[3:]  # Убираем 'ref'
+            if referral_code.startswith('_'):
+                referral_code = referral_code[1:]  # Убираем '_' если есть
+            
+            logger.info(f"🔍 Обработка реферального кода: {referral_code} для пользователя {user_id}")
+            
+            # Пытаемся извлечь ID рефера
+            try:
+                referrer_id = int(referral_code)
+                if referrer_id == user_id:
+                    logger.warning(f"⚠️ Пользователь {user_id} пытается пригласить самого себя")
+                else:
+                    # Регистрируем реферальную связь через API
+                    logger.info(f"🔄 Регистрация реферала: {referrer_id} -> {user_id}")
+                    try:
+                        async with httpx.AsyncClient(timeout=10.0) as client:
+                            response = await client.post(
+                                f"{API_URL}/api/referral/register",
+                                json={
+                                    "referrer_id": str(referrer_id),
+                                    "referred_id": str(user_id),
+                                    "username": user.username,
+                                    "first_name": user.first_name,
+                                    "last_name": user.last_name
+                                },
+                                headers={"Content-Type": "application/json"}
+                            )
+                            
+                            logger.info(f"📡 Ответ API: статус {response.status_code}")
+                            
+                            if response.status_code == 200:
+                                data = response.json()
+                                logger.info(f"📋 Данные ответа: {data}")
+                                if data.get('success'):
+                                    logger.info(f"✅ Реферальная связь зарегистрирована: {referrer_id} -> {user_id}")
                                 else:
+                                    error_msg = data.get('error', 'Unknown error')
+                                    logger.warning(f"⚠️ Не удалось зарегистрировать реферала: {error_msg}")
+                            else:
+                                try:
+                                    error_text = response.text
+                                    logger.error(f"❌ Ошибка API при регистрации реферала: {response.status_code} - {error_text[:200]}")
+                                except:
                                     logger.error(f"❌ Ошибка API при регистрации реферала: {response.status_code}")
-                        except Exception as e:
-                            logger.error(f"❌ Ошибка при регистрации реферала: {e}")
-                except ValueError:
-                    logger.warning(f"⚠️ Неверный формат реферального кода: {referral_code}")
+                    except httpx.TimeoutException:
+                        logger.error(f"❌ Таймаут при регистрации реферала (превышено 10 секунд)")
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка при регистрации реферала: {e}", exc_info=True)
+            except ValueError as e:
+                logger.warning(f"⚠️ Неверный формат реферального кода '{referral_code}': {e}")
     
     # Отправляем главное меню
     try:

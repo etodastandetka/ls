@@ -22,9 +22,10 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    // 🛡️ МАКСИМАЛЬНАЯ ЗАЩИТА
-    const protectionResult = protectAPI(request)
-    if (protectionResult) return protectionResult
+    // 🛡️ ПУБЛИЧНЫЙ API - защита отключена для корректной работы из браузера
+    // Для публичного API referral/register отключаем protectAPI, т.к. запросы идут из браузера
+    // (Telegram WebApp открывается в браузере и не всегда имеет правильный user-agent)
+    // Защита обеспечивается через rate limiting и валидацию входных данных
 
     // Rate limiting (строгий для публичного endpoint)
     const rateLimitResult = rateLimit({ 
@@ -42,6 +43,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    
+    console.log('📋 [Referral Register] Входящий запрос на регистрацию реферала:', {
+      referrer_id: body.referrer_id || body.referrerId,
+      referred_id: body.referred_id || body.referredId,
+      username: body.username,
+      first_name: body.first_name || body.firstName,
+      last_name: body.last_name || body.lastName,
+      ip: getClientIP(request),
+      user_agent: request.headers.get('user-agent')?.substring(0, 100)
+    })
     
     // 🛡️ Валидация и очистка всех входных данных
     const sanitizedBody = sanitizeInput(body)
@@ -218,6 +229,13 @@ export async function POST(request: NextRequest) {
         referrerId: referrerIdBigInt,
         referredId: referredIdBigInt
       }
+    })
+    
+    console.log('✅ [Referral Register] Реферальная связь успешно создана:', {
+      referral_id: referral.id,
+      referrer_id: referrerIdBigInt.toString(),
+      referred_id: referredIdBigInt.toString(),
+      created_at: referral.createdAt.toISOString()
     })
     
     const response = NextResponse.json({
