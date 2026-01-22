@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useLanguage } from '../../../../components/LanguageContext'
 import PageTransition from '../../../../components/PageTransition'
 import { safeFetch, getApiBase } from '../../../../utils/fetch'
-import { getTelegramUserId } from '../../../../utils/telegram'
+import { getTelegramUserId, getTelegramUser } from '../../../../utils/telegram'
 import { useRequireAuth } from '../../../../hooks/useRequireAuth'
 
 function ReferralWithdrawStep2Content() {
@@ -81,26 +81,28 @@ function ReferralWithdrawStep2Content() {
     try {
       setLoading(true)
 
-      const tg = (window as any).Telegram?.WebApp
-      let userId = null
+      // Используем оптимизированную функцию для получения ID (как в основной странице рефералки)
+      let userId = getTelegramUserId()
       
-      if (tg?.initDataUnsafe?.user?.id) {
-        userId = tg.initDataUnsafe.user.id
-      } else if (tg?.initData) {
+      // Если userId не получен, пробуем получить из localStorage (fallback)
+      if (!userId && typeof window !== 'undefined') {
         try {
-          const params = new URLSearchParams(tg.initData)
-          const userParam = params.get('user')
-          if (userParam) {
-            const userData = JSON.parse(decodeURIComponent(userParam))
-            userId = userData.id
+          const savedUser = localStorage.getItem('telegram_user')
+          if (savedUser) {
+            const userData = JSON.parse(savedUser)
+            if (userData && userData.id) {
+              userId = String(userData.id)
+              console.log('✅ Восстановлен userId из localStorage:', userId)
+            }
           }
         } catch (e) {
-          // Игнорируем ошибки парсинга
+          console.warn('⚠️ Ошибка при чтении userId из localStorage:', e)
         }
       }
 
       if (!userId) {
-        alert('Ошибка: не удалось получить ID пользователя')
+        alert('Ошибка: не удалось получить ID пользователя. Пожалуйста, откройте приложение через Telegram.')
+        setLoading(false)
         return
       }
 
@@ -115,15 +117,19 @@ function ReferralWithdrawStep2Content() {
 
       const apiUrl = getApiBase()
 
+      // Получаем данные пользователя из Telegram WebApp или localStorage
+      const tg = (window as any).Telegram?.WebApp
+      const telegramUser = getTelegramUser()
+      
       const requestBody = {
         user_id: userId,
         bookmaker: bookmaker,
         account_id: accountId.trim(),
         amount: availableBalance, // Выводим весь баланс
         telegram_data: {
-          username: tg?.initDataUnsafe?.user?.username || null,
-          first_name: tg?.initDataUnsafe?.user?.first_name || null,
-          last_name: tg?.initDataUnsafe?.user?.last_name || null,
+          username: telegramUser?.username || tg?.initDataUnsafe?.user?.username || null,
+          first_name: telegramUser?.first_name || tg?.initDataUnsafe?.user?.first_name || null,
+          last_name: telegramUser?.last_name || tg?.initDataUnsafe?.user?.last_name || null,
           phone_number: tg?.initDataUnsafe?.user?.phone_number || null,
         }
       }
