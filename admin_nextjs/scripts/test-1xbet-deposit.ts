@@ -1,13 +1,15 @@
 /**
  * Тестовый скрипт для пополнения баланса в 1xbet
- * Использование: npx ts-node scripts/test-1xbet-deposit.ts
+ * Использование: 
+ *   cd admin_nextjs
+ *   npx tsx scripts/test-1xbet-deposit.ts
  */
 
 import { depositCashdeskAPI } from '../lib/casino-deposit'
 
 async function testDeposit() {
-  const accountId = '1219358907' // ID казино
-  const amount = 10 // Сумма в сомах
+  const accountId = '1530777653' // ID казино
+  const amount = 5000.45 // Сумма в сомах
   const bookmaker = '1xbet'
 
   // Конфигурация из casino_api_config.py

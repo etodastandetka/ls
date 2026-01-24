@@ -380,14 +380,14 @@ export default function ReferralPage() {
     
     loadData()
     
-    // Автообновление баланса каждые 30 секунд
+    // Автообновление данных каждые 10 секунд (быстрее для отображения новых рефералов)
     const intervalId = setInterval(() => {
       if (mounted) {
         loadData()
       }
-    }, 30000) // 30 секунд
+    }, 10000) // 10 секунд
     
-    // Обновляем данные при фокусе страницы (когда пользователь возвращается)
+    // Обновляем данные при фокусе страницы и при видимости страницы
     const handleFocus = () => {
       if (mounted) {
         console.log('🔄 Страница получила фокус, обновляю данные...')
@@ -395,12 +395,21 @@ export default function ReferralPage() {
       }
     }
     
+    const handleVisibilityChange = () => {
+      if (mounted && !document.hidden) {
+        console.log('🔄 Страница стала видимой, обновляю данные...')
+        loadData()
+      }
+    }
+    
     window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     
     return () => {
       mounted = false
       clearInterval(intervalId)
       window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

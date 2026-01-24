@@ -231,10 +231,17 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Создаем реферальную связь
+    // Создаем реферальную связь (используем upsert для избежания ошибок дубликатов)
     console.log(`🔄 [Referral Register] Создание реферальной связи: ${referrerIdBigInt} -> ${referredIdBigInt}`)
-    const referral = await prisma.botReferral.create({
-      data: {
+    const referral = await prisma.botReferral.upsert({
+      where: {
+        referredId: referredIdBigInt
+      },
+      update: {
+        // Если уже существует, обновляем только если рефер другой (не должно произойти из-за проверки выше)
+        referrerId: referrerIdBigInt
+      },
+      create: {
         referrerId: referrerIdBigInt,
         referredId: referredIdBigInt
       }
@@ -277,11 +284,34 @@ export async function POST(request: NextRequest) {
     return response
     
   } catch (error: any) {
-    console.error('Referral register error:', error)
+    console.error('❌ [Referral Register] Ошибка при регистрации реферала:', {
+      error: error.message,
+      code: error.code,
+      meta: error.meta,
+      referrer_id: body?.referrer_id || body?.referrerId || 'unknown',
+      referred_id: body?.referred_id || body?.referredId || 'unknown'
+    })
+    
+    // Обрабатываем специфичные ошибки Prisma
+    let errorMessage = error.message || 'Failed to register referral'
+    let statusCode = 500
+    
+    // Ошибка уникального ограничения (пользователь уже является рефералом другого рефера)
+    if (error.code === 'P2002') {
+      errorMessage = 'User already referred by another user'
+      statusCode = 400
+    }
+    // Ошибка внешнего ключа
+    else if (error.code === 'P2003') {
+      errorMessage = 'Invalid referrer or referred user ID'
+      statusCode = 400
+    }
+    
     const errorResponse = NextResponse.json({
       success: false,
-      error: error.message || 'Failed to register referral'
-    }, { status: 500 })
+      error: errorMessage,
+      error_code: error.code || 'UNKNOWN_ERROR'
+    }, { status: statusCode })
     errorResponse.headers.set('Access-Control-Allow-Origin', '*')
     return errorResponse
   }
