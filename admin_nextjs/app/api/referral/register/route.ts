@@ -21,6 +21,8 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  let body: any = null
+  
   try {
     // 🛡️ ПУБЛИЧНЫЙ API - защита отключена для корректной работы из браузера
     // Для публичного API referral/register отключаем protectAPI, т.к. запросы идут из браузера
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
       return response
     }
 
-    const body = await request.json()
+    body = await request.json()
     
     console.log('📋 [Referral Register] Входящий запрос на регистрацию реферала:', {
       referrer_id: body.referrer_id || body.referrerId,
