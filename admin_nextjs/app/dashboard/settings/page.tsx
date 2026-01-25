@@ -17,6 +17,12 @@ interface Settings {
     mostbet: boolean
     winwin: boolean
   }
+  bookmaker_settings?: {
+    [key: string]: {
+      deposit_enabled: boolean
+      withdraw_enabled: boolean
+    }
+  }
   channel_subscription_enabled: boolean
   channel_username: string
   channel_id: string
@@ -341,6 +347,79 @@ export default function SettingsPage() {
               </label>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Настройки депозитов и выводов по букмекерам */}
+      <div className="bg-gray-800 bg-opacity-50 rounded-xl p-4 mb-4 border border-gray-700 backdrop-blur-sm">
+        <h2 className="text-base font-bold text-white mb-4">Управление депозитами и выводами по букмекерам</h2>
+        <p className="text-xs text-gray-400 mb-4">Контроль пополнений и выводов для каждого букмекера отдельно</p>
+        
+        <div className="space-y-4">
+          {(['1xbet', '1win', 'melbet', 'mostbet', 'winwin'] as const).map((bookmaker) => {
+            const bookmakerSettings = settings.bookmaker_settings?.[bookmaker] || {
+              deposit_enabled: true,
+              withdraw_enabled: true
+            }
+            
+            return (
+              <div key={bookmaker} className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                <h3 className="text-sm font-semibold text-white mb-3 uppercase">{bookmaker}</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-white">Пополнения</p>
+                      <p className="text-xs text-gray-400">Разрешить депозиты для {bookmaker}</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={bookmakerSettings.deposit_enabled}
+                        onChange={(e) => {
+                          const newBookmakerSettings = {
+                            ...settings.bookmaker_settings,
+                            [bookmaker]: {
+                              ...bookmakerSettings,
+                              deposit_enabled: e.target.checked
+                            }
+                          }
+                          updateSetting('bookmaker_settings', newBookmakerSettings)
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-white">Выводы</p>
+                      <p className="text-xs text-gray-400">Разрешить выводы для {bookmaker}</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={bookmakerSettings.withdraw_enabled}
+                        onChange={(e) => {
+                          const newBookmakerSettings = {
+                            ...settings.bookmaker_settings,
+                            [bookmaker]: {
+                              ...bookmakerSettings,
+                              withdraw_enabled: e.target.checked
+                            }
+                          }
+                          updateSetting('bookmaker_settings', newBookmakerSettings)
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 

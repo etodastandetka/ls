@@ -215,41 +215,76 @@ export async function POST(request: NextRequest) {
     }
 
     // 🛡️ КРИТИЧНАЯ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: проверяем ДО создания заявки
-    // Для ВЫВОДА: проверяем, включены ли выводы и нет ли уже pending заявки
-    if (type === 'withdraw' && finalUserId) {
-      // Проверяем настройки выводов
-      const configs = await prisma.botConfiguration.findMany()
-      const settingsMap: Record<string, any> = {}
-      
-      configs.forEach((config) => {
-        let value: any = config.value
-        if (typeof value === 'string') {
-          try {
-            value = JSON.parse(value)
-          } catch {
-            // Если не JSON, оставляем как строку
-          }
+    // Загружаем настройки один раз для всех проверок
+    const configs = await prisma.botConfiguration.findMany()
+    const settingsMap: Record<string, any> = {}
+    
+    configs.forEach((config) => {
+      let value: any = config.value
+      if (typeof value === 'string') {
+        try {
+          value = JSON.parse(value)
+        } catch {
+          // Если не JSON, оставляем как строку
         }
-        settingsMap[config.key] = value
-      })
+      }
+      settingsMap[config.key] = value
+    })
 
+    // Получаем список админов
+    let adminIds = settingsMap.admin_telegram_ids || []
+    if (typeof adminIds === 'string') {
+      try {
+        adminIds = JSON.parse(adminIds)
+      } catch {
+        adminIds = adminIds.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0)
+      }
+    }
+    const adminIdsArray = Array.isArray(adminIds) ? adminIds : []
+    const isAdmin = finalUserId && adminIdsArray.includes(finalUserId.toString())
+
+    // Получаем настройки букмекеров
+    const bookmakerSettings = settingsMap.bookmaker_settings || {
+      '1xbet': { deposit_enabled: true, withdraw_enabled: true },
+      '1win': { deposit_enabled: true, withdraw_enabled: true },
+      melbet: { deposit_enabled: true, withdraw_enabled: true },
+      mostbet: { deposit_enabled: true, withdraw_enabled: true },
+      winwin: { deposit_enabled: true, withdraw_enabled: true }
+    }
+
+    // Нормализуем название букмекера для проверки
+    const normalizedBookmaker = bookmaker ? bookmaker.toLowerCase().trim() : ''
+    const bookmakerKey = normalizedBookmaker === '1win' ? '1win' :
+                        normalizedBookmaker === '1xbet' ? '1xbet' :
+                        normalizedBookmaker === 'melbet' ? 'melbet' :
+                        normalizedBookmaker === 'mostbet' ? 'mostbet' :
+                        normalizedBookmaker === 'winwin' ? 'winwin' : null
+
+    // Проверка настроек депозитов
+    if (type === 'deposit' && bookmakerKey && !isAdmin) {
+      const bookmakerDepositEnabled = bookmakerSettings[bookmakerKey]?.deposit_enabled !== false
+      
+      if (!bookmakerDepositEnabled) {
+        console.error(`🚫 [Payment API] BLOCKED: Deposits disabled for bookmaker ${bookmakerKey} for user ${finalUserId}`)
+        return NextResponse.json(
+          createApiResponse(null, `Пополнения для ${bookmaker} временно недоступны. Попробуйте позже.`),
+          {
+            status: 403,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+            }
+          }
+        )
+      }
+    }
+
+    // Проверка настроек выводов
+    if (type === 'withdraw' && finalUserId) {
       // Получаем настройки выводов
       const withdrawalSettings = settingsMap.withdrawal_settings || settingsMap.withdrawals || {
         enabled: true,
         banks: []
       }
-
-      // Получаем список админов
-      let adminIds = settingsMap.admin_telegram_ids || []
-      if (typeof adminIds === 'string') {
-        try {
-          adminIds = JSON.parse(adminIds)
-        } catch {
-          adminIds = adminIds.split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0)
-        }
-      }
-      const adminIdsArray = Array.isArray(adminIds) ? adminIds : []
-      const isAdmin = finalUserId && adminIdsArray.includes(finalUserId.toString())
 
       // Проверяем, включены ли выводы
       const withdrawalsEnabled = typeof withdrawalSettings === 'object' 
@@ -268,6 +303,24 @@ export async function POST(request: NextRequest) {
             }
           }
         )
+      }
+
+      // Проверка настроек букмекера для выводов
+      if (bookmakerKey && !isAdmin) {
+        const bookmakerWithdrawEnabled = bookmakerSettings[bookmakerKey]?.withdraw_enabled !== false
+        
+        if (!bookmakerWithdrawEnabled) {
+          console.error(`🚫 [Payment API] BLOCKED: Withdrawals disabled for bookmaker ${bookmakerKey} for user ${finalUserId}`)
+          return NextResponse.json(
+            createApiResponse(null, `Выводы для ${bookmaker} временно недоступны. Попробуйте позже.`),
+            {
+              status: 403,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+              }
+            }
+          )
+        }
       }
 
       // Проверка на pending заявку убрана - пользователь может отправить только один раз через фронтенд

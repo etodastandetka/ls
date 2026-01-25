@@ -44,6 +44,15 @@ export async function GET(request: NextRequest) {
       winwin: true
     }
 
+    // Получаем настройки букмекеров (депозиты и выводы)
+    const bookmakerSettings = settingsMap.bookmaker_settings || {
+      '1xbet': { deposit_enabled: true, withdraw_enabled: true },
+      '1win': { deposit_enabled: true, withdraw_enabled: true },
+      melbet: { deposit_enabled: true, withdraw_enabled: true },
+      mostbet: { deposit_enabled: true, withdraw_enabled: true },
+      winwin: { deposit_enabled: true, withdraw_enabled: true }
+    }
+
     // Получаем настройки канала
     const channelSettings = settingsMap.channel_subscription || {}
     
@@ -62,6 +71,7 @@ export async function GET(request: NextRequest) {
       deposit_video_url: settingsMap.deposit_video_url || '',
       withdraw_video_url: settingsMap.withdraw_video_url || '',
       admin_telegram_ids: settingsMap.admin_telegram_ids || '',
+      bookmaker_settings: bookmakerSettings,
     }
 
     return NextResponse.json(createApiResponse(settings))
@@ -151,6 +161,10 @@ export async function POST(request: NextRequest) {
         adminIds = body.admin_telegram_ids
       }
       await updateSetting('admin_telegram_ids', adminIds, 'Telegram ID админов (пополнения и выводы всегда включены)')
+    }
+
+    if (body.bookmaker_settings !== undefined) {
+      await updateSetting('bookmaker_settings', body.bookmaker_settings, 'Настройки депозитов и выводов по букмекерам')
     }
 
     return NextResponse.json(
