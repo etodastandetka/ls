@@ -159,7 +159,8 @@ export async function POST(request: NextRequest) {
     
     if (existingReferral) {
       // Если уже есть реферал, но от другого рефера, возвращаем ошибку
-      if (existingReferral.referrerId.toString() !== referrerId) {
+      // Сравниваем BigInt с BigInt для корректного сравнения
+      if (existingReferral.referrerId !== referrerIdBigInt) {
         const errorResponse = NextResponse.json({
           success: false,
           error: 'User already referred by another user'
@@ -233,17 +234,11 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Создаем реферальную связь (используем upsert для избежания ошибок дубликатов)
+    // Создаем реферальную связь
+    // На этом этапе мы уже проверили, что связи не существует, поэтому просто создаем
     console.log(`🔄 [Referral Register] Создание реферальной связи: ${referrerIdBigInt} -> ${referredIdBigInt}`)
-    const referral = await prisma.botReferral.upsert({
-      where: {
-        referredId: referredIdBigInt
-      },
-      update: {
-        // Если уже существует, обновляем только если рефер другой (не должно произойти из-за проверки выше)
-        referrerId: referrerIdBigInt
-      },
-      create: {
+    const referral = await prisma.botReferral.create({
+      data: {
         referrerId: referrerIdBigInt,
         referredId: referredIdBigInt
       }
