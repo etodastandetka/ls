@@ -428,6 +428,7 @@ async def load_settings():
                 settings_cache['casinos'] = data.get('casinos', {})
                 deposits_data = data.get('deposits', {})
                 withdrawals_data = data.get('withdrawals', {})
+                bookmaker_settings = data.get('bookmaker_settings', {})
                 
                 if isinstance(deposits_data, dict):
                     settings_cache['deposit_banks'] = deposits_data.get('banks', [])
@@ -443,10 +444,13 @@ async def load_settings():
                     settings_cache['withdrawal_banks'] = []
                     settings_cache['withdrawals_enabled'] = True
                 
+                # Сохраняем настройки букмекеров
+                settings_cache['bookmaker_settings'] = bookmaker_settings
+                
                 settings_cache['pause'] = data.get('pause', False)
                 settings_cache['maintenance_message'] = data.get('maintenance_message', 'Технические работы. Попробуйте позже.')
                 settings_cache['last_update'] = asyncio.get_event_loop().time()
-                logger.info(f"✅ Настройки загружены: казино={len(settings_cache['casinos'])}, депозиты={settings_cache['deposits_enabled']} (банки: {len(settings_cache['deposit_banks'])}), выводы={settings_cache['withdrawals_enabled']} (банки: {len(settings_cache['withdrawal_banks'])}), пауза={settings_cache['pause']}")
+                logger.info(f"✅ Настройки загружены: казино={len(settings_cache['casinos'])}, депозиты={settings_cache['deposits_enabled']} (банки: {len(settings_cache['deposit_banks'])}), выводы={settings_cache['withdrawals_enabled']} (банки: {len(settings_cache['withdrawal_banks'])}), букмекеры={len(bookmaker_settings)}, пауза={settings_cache['pause']}")
     except Exception as e:
         logger.warning(f"⚠️ Не удалось загрузить настройки: {e}, используем значения по умолчанию")
         # Значения по умолчанию
@@ -455,6 +459,13 @@ async def load_settings():
         settings_cache['withdrawal_banks'] = ['kompanion', 'odengi', 'bakai', 'balance', 'megapay', 'mbank']
         settings_cache['deposits_enabled'] = True
         settings_cache['withdrawals_enabled'] = True
+        settings_cache['bookmaker_settings'] = {
+            '1xbet': { 'deposit_enabled': True, 'withdraw_enabled': True },
+            '1win': { 'deposit_enabled': True, 'withdraw_enabled': True },
+            'melbet': { 'deposit_enabled': True, 'withdraw_enabled': True },
+            'mostbet': { 'deposit_enabled': True, 'withdraw_enabled': True },
+            'winwin': { 'deposit_enabled': True, 'withdraw_enabled': True }
+        }
         settings_cache['pause'] = False
         settings_cache['maintenance_message'] = 'Технические работы. Попробуйте позже.'
 
@@ -1003,6 +1014,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     await update.message.reply_text(get_text('please_select_from_buttons'))
                     return
                 
+                # Проверяем настройки букмекера для депозитов
+                bookmaker_settings = settings_cache.get('bookmaker_settings', {})
+                bookmaker_key = bookmaker.lower()
+                bookmaker_deposit_enabled = True
+                
+                if bookmaker_settings and bookmaker_key in bookmaker_settings:
+                    bookmaker_deposit_enabled = bookmaker_settings[bookmaker_key].get('deposit_enabled', True)
+                
+                if not bookmaker_deposit_enabled:
+                    casino_name = get_casino_name(bookmaker)
+                    await update.message.reply_text(
+                        f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.",
+                        parse_mode='HTML'
+                    )
+                    logger.info(f"❌ Депозиты отключены для букмекера {bookmaker}, пользователь {user_id} попытался пополнить")
+                    return
+                
                 data['bookmaker'] = bookmaker
                 state['step'] = 'deposit_player_id'
                 user_states[user_id] = state
@@ -1089,6 +1117,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 bookmaker = bookmaker_map.get(message_text)
                 if not bookmaker:
                     await update.message.reply_text(get_text('please_select_from_buttons'))
+                    return
+                
+                # Проверяем настройки букмекера для выводов
+                bookmaker_settings = settings_cache.get('bookmaker_settings', {})
+                bookmaker_key = bookmaker.lower()
+                bookmaker_withdraw_enabled = True
+                
+                if bookmaker_settings and bookmaker_key in bookmaker_settings:
+                    bookmaker_withdraw_enabled = bookmaker_settings[bookmaker_key].get('withdraw_enabled', True)
+                
+                if not bookmaker_withdraw_enabled:
+                    casino_name = get_casino_name(bookmaker)
+                    await update.message.reply_text(
+                        f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.",
+                        parse_mode='HTML'
+                    )
+                    logger.info(f"❌ Выводы отключены для букмекера {bookmaker}, пользователь {user_id} попытался вывести")
                     return
                 
                 data['bookmaker'] = bookmaker

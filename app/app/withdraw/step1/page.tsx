@@ -180,16 +180,30 @@ export default function WithdrawStep1() {
           setWithdrawalsEnabled(false)
         }
         
+        const disabled: string[] = []
+        
+        // Проверяем общие настройки казино
         if (data && data.casinos) {
-          const disabled: string[] = []
           if (data.casinos['1xbet'] === false) disabled.push('1xbet')
           if (data.casinos['1win'] === false) disabled.push('1win')
           if (data.casinos['melbet'] === false) disabled.push('melbet')
           if (data.casinos['mostbet'] === false) disabled.push('mostbet')
           if (data.casinos['winwin'] === false) disabled.push('winwin')
           if (data.casinos['888starz'] === false) disabled.push('888starz')
-          setDisabledCasinos(disabled)
         }
+        
+        // Проверяем настройки букмекеров для выводов
+        if (data && data.bookmaker_settings) {
+          const bookmakerSettings = data.bookmaker_settings
+          if (bookmakerSettings['1xbet']?.withdraw_enabled === false) disabled.push('1xbet')
+          if (bookmakerSettings['1win']?.withdraw_enabled === false) disabled.push('1win')
+          if (bookmakerSettings['melbet']?.withdraw_enabled === false) disabled.push('melbet')
+          if (bookmakerSettings['mostbet']?.withdraw_enabled === false) disabled.push('mostbet')
+          if (bookmakerSettings['winwin']?.withdraw_enabled === false) disabled.push('winwin')
+          if (bookmakerSettings['888starz']?.withdraw_enabled === false) disabled.push('888starz')
+        }
+        
+        setDisabledCasinos(disabled)
       } catch (error) {
         console.error('Error loading settings:', error)
       }

@@ -107,12 +107,33 @@ export async function GET(request: NextRequest) {
       winwin: true
     }
 
+    // Получаем настройки букмекеров (депозиты и выводы)
+    let bookmakerSettings = settingsMap.bookmaker_settings || {
+      '1xbet': { deposit_enabled: true, withdraw_enabled: true },
+      '1win': { deposit_enabled: true, withdraw_enabled: true },
+      melbet: { deposit_enabled: true, withdraw_enabled: true },
+      mostbet: { deposit_enabled: true, withdraw_enabled: true },
+      winwin: { deposit_enabled: true, withdraw_enabled: true }
+    }
+
+    // Если пользователь админ - всегда включаем депозиты и выводы для всех букмекеров
+    if (isAdmin) {
+      bookmakerSettings = {
+        '1xbet': { deposit_enabled: true, withdraw_enabled: true },
+        '1win': { deposit_enabled: true, withdraw_enabled: true },
+        melbet: { deposit_enabled: true, withdraw_enabled: true },
+        mostbet: { deposit_enabled: true, withdraw_enabled: true },
+        winwin: { deposit_enabled: true, withdraw_enabled: true }
+      }
+    }
+
     // Формируем ответ в формате, который ожидает клиентский сайт
     const response = {
       success: true,
       deposits: typeof depositSettings === 'object' ? depositSettings : { enabled: depositSettings !== false, banks: [] },
       withdrawals: typeof withdrawalSettings === 'object' ? withdrawalSettings : { enabled: withdrawalSettings !== false, banks: [] },
       casinos: casinoSettings,
+      bookmaker_settings: bookmakerSettings,
       pause: settingsMap.pause === 'true' || settingsMap.pause === true,
       maintenance_message: settingsMap.maintenance_message || 'Технические работы. Попробуйте позже.',
       require_receipt_photo: settingsMap.require_receipt_photo === 'true' || settingsMap.require_receipt_photo === true,
@@ -134,6 +155,13 @@ export async function GET(request: NextRequest) {
         melbet: true,
         mostbet: true,
         winwin: true
+      },
+      bookmaker_settings: {
+        '1xbet': { deposit_enabled: true, withdraw_enabled: true },
+        '1win': { deposit_enabled: true, withdraw_enabled: true },
+        melbet: { deposit_enabled: true, withdraw_enabled: true },
+        mostbet: { deposit_enabled: true, withdraw_enabled: true },
+        winwin: { deposit_enabled: true, withdraw_enabled: true }
       },
       pause: false,
       maintenance_message: 'Технические работы. Попробуйте позже.',
