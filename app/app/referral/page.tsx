@@ -20,6 +20,8 @@ export default function ReferralPage() {
   const [availableBalance, setAvailableBalance] = useState(0)
   const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false)
   const [referralsList, setReferralsList] = useState<any[]>([])
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, referredId: string} | null>(null)
+  const [deletingReferral, setDeletingReferral] = useState<string | null>(null)
   const [referralSettings, setReferralSettings] = useState({
     referral_percentage: 5,
     min_payout: 100,
@@ -499,6 +501,100 @@ export default function ReferralPage() {
     window.open(shareUrl, '_blank')
   }
 
+  // Обработчик контекстного меню (правой кнопкой мыши)
+  const handleContextMenu = (e: React.MouseEvent, referredId: string) => {
+    // Проверяем, что это не мобильное устройство (только для ПК)
+    if (window.innerWidth > 768) {
+      e.preventDefault()
+      
+      // Позиционируем меню так, чтобы оно не выходило за границы экрана
+      let x = e.clientX
+      let y = e.clientY
+      const menuWidth = 200
+      const menuHeight = 50
+      
+      if (x + menuWidth > window.innerWidth) {
+        x = window.innerWidth - menuWidth - 10
+      }
+      if (y + menuHeight > window.innerHeight) {
+        y = window.innerHeight - menuHeight - 10
+      }
+      
+      setContextMenu({
+        x,
+        y,
+        referredId
+      })
+    }
+  }
+
+  // Закрытие контекстного меню
+  const closeContextMenu = () => {
+    setContextMenu(null)
+  }
+
+  // Удаление реферала
+  const deleteReferral = async (referredId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этого реферала? Это действие нельзя отменить.')) {
+      return
+    }
+
+    setDeletingReferral(referredId)
+    setContextMenu(null)
+
+    try {
+      const userId = getTelegramUserId()
+      if (!userId) {
+        alert('Не удалось определить ID пользователя')
+        return
+      }
+
+      const apiUrl = getApiBase()
+      const response = await safeFetchJson(`${apiUrl}/api/referral/delete?referrer_id=${userId}&referred_id=${referredId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 8000,
+        retries: 1,
+      })
+
+      if (response && response.success) {
+        // Удаляем реферала из списка
+        setReferralsList(prev => prev.filter(ref => ref.referred_id !== referredId))
+        // Перезагружаем данные
+        await loadReferralData()
+        alert('Реферал успешно удален')
+      } else {
+        alert(response?.error || 'Ошибка при удалении реферала')
+      }
+    } catch (error: any) {
+      console.error('Ошибка при удалении реферала:', error)
+      alert('Ошибка при удалении реферала. Попробуйте позже.')
+    } finally {
+      setDeletingReferral(null)
+    }
+  }
+
+  // Закрытие контекстного меню при клике вне его
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu) {
+        setContextMenu(null)
+      }
+    }
+
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside)
+      document.addEventListener('contextmenu', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('contextmenu', handleClickOutside)
+    }
+  }, [contextMenu])
+
   return (
     <>
     <main className="space-y-6">
@@ -720,8 +816,13 @@ export default function ReferralPage() {
           <div className="space-y-3">
             {referralsList.map((ref: any) => {
               const hasDeposits = (ref.deposits_count || 0) > 0
+              const isDeleting = deletingReferral === ref.referred_id
               return (
-                <div key={ref.referred_id} className={`rounded-2xl border ${hasDeposits ? 'border-emerald-500/20' : 'border-gray-500/20'} bg-gradient-to-br ${hasDeposits ? 'from-green-500/10 to-emerald-500/5' : 'from-gray-500/5 to-gray-600/5'} p-4`}>
+                <div 
+                  key={ref.referred_id} 
+                  className={`rounded-2xl border ${hasDeposits ? 'border-emerald-500/20' : 'border-gray-500/20'} bg-gradient-to-br ${hasDeposits ? 'from-green-500/10 to-emerald-500/5' : 'from-gray-500/5 to-gray-600/5'} p-4 ${isDeleting ? 'opacity-50' : ''} cursor-context-menu`}
+                  onContextMenu={(e) => handleContextMenu(e, ref.referred_id)}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${hasDeposits ? 'bg-gradient-to-br from-green-400 to-emerald-500' : 'bg-gradient-to-br from-gray-400 to-gray-500'}`}>
@@ -761,6 +862,28 @@ export default function ReferralPage() {
             })}
           </div>
         </section>
+      )}
+
+      {/* Контекстное меню для удаления реферала (только на ПК) */}
+      {contextMenu && (
+        <div
+          className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 min-w-[200px]"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => deleteReferral(contextMenu.referredId)}
+            className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-500/20 transition-colors flex items-center space-x-2 rounded-lg"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Удалить реферала</span>
+          </button>
+        </div>
       )}
 
       {/* Топ игроков - показываем всегда, даже если не из бота */}
