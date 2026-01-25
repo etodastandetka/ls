@@ -629,7 +629,7 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      take: 50, // Берем до 50 рефералов
+      // Убираем ограничение - возвращаем всех рефералов
       orderBy: {
         createdAt: 'desc'
       }
