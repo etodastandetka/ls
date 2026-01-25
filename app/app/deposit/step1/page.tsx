@@ -236,6 +236,14 @@ export default function DepositStep1() {
         // Убираем дубликаты
         const uniqueDisabled = [...new Set(disabled)]
         setDisabledCasinos(uniqueDisabled)
+        
+        // Временное логирование для отладки
+        console.log('[Deposit Step1] Settings loaded:', {
+          depositsEnabled,
+          disabledCasinos: uniqueDisabled,
+          bookmakerSettings: data?.bookmaker_settings,
+          '1win_deposit_enabled': data?.bookmaker_settings?.['1win']?.deposit_enabled
+        })
       } catch (error) {
         console.error('Error loading settings:', error)
       }
@@ -258,6 +266,12 @@ export default function DepositStep1() {
   const handleNext = () => {
     if (!bookmaker) {
       alert('Выберите казино')
+      return
+    }
+    
+    // Проверяем, не отключен ли выбранный букмекер
+    if (disabledCasinos && disabledCasinos.includes(bookmaker)) {
+      alert('Это казино временно недоступно для пополнения. Выберите другое.')
       return
     }
     

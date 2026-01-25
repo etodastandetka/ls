@@ -207,6 +207,14 @@ export default function WithdrawStep1() {
         // Убираем дубликаты
         const uniqueDisabled = [...new Set(disabled)]
         setDisabledCasinos(uniqueDisabled)
+        
+        // Временное логирование для отладки
+        console.log('[Withdraw Step1] Settings loaded:', {
+          withdrawalsEnabled,
+          disabledCasinos: uniqueDisabled,
+          bookmakerSettings: data?.bookmaker_settings,
+          '1win_withdraw_enabled': data?.bookmaker_settings?.['1win']?.withdraw_enabled
+        })
       } catch (error) {
         console.error('Error loading settings:', error)
       }
@@ -259,6 +267,12 @@ export default function WithdrawStep1() {
   const handleNext = () => {
     if (!bookmaker) {
       alert('Выберите казино')
+      return
+    }
+    
+    // Проверяем, не отключен ли выбранный букмекер
+    if (disabledCasinos && disabledCasinos.includes(bookmaker)) {
+      alert('Это казино временно недоступно для вывода. Выберите другое.')
       return
     }
     

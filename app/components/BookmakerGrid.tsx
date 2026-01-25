@@ -105,11 +105,12 @@ function BookmakerGrid({
             <button 
               key={b.key}
               onClick={() => handleClick(b.key)}
+              disabled={isDisabled}
               className={`relative overflow-hidden rounded-xl transition-all duration-100 ${cardHeight} ${
                 value === b.key 
                   ? 'ring-2 ring-green-400' 
                   : isDisabled
-                  ? 'opacity-60 cursor-not-allowed'
+                  ? 'opacity-70 cursor-not-allowed grayscale'
                   : ''
               }`}
             >
@@ -132,9 +133,16 @@ function BookmakerGrid({
                 </div>
               )}
               {isDisabled && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <span className="text-white/70 text-xs">Недоступно</span>
-                </div>
+                <>
+                  {/* Баннер сверху */}
+                  <div className="absolute top-0 left-0 right-0 bg-red-600/90 text-white text-xs font-bold py-1.5 px-2 text-center z-10">
+                    НЕДОСТУПНО
+                  </div>
+                  {/* Затемнение всей карточки */}
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-0">
+                    <span className="text-white/80 text-sm font-semibold">Недоступно</span>
+                  </div>
+                </>
               )}
             </button>
           )
