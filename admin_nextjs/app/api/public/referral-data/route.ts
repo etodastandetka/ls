@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting для публичного endpoint
     // Используем user_id в ключе, чтобы каждый пользователь имел свой лимит
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('user_id')
+    let userId = searchParams.get('user_id')
     const topOnly = searchParams.get('top_only') === 'true'
     
     // Для запросов с user_id используем более мягкий лимит (так как это легитимные запросы от пользователей)
