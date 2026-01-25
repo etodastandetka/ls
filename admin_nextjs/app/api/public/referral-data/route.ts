@@ -27,11 +27,26 @@ export async function GET(request: NextRequest) {
     // (Telegram WebApp открывается в браузере и не всегда имеет правильный user-agent)
     // Защита обеспечивается через rate limiting и валидацию входных данных
 
-    // Rate limiting (строгий для публичного endpoint)
+    // Rate limiting для публичного endpoint
+    // Используем user_id в ключе, чтобы каждый пользователь имел свой лимит
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('user_id')
+    const topOnly = searchParams.get('top_only') === 'true'
+    
+    // Для запросов с user_id используем более мягкий лимит (так как это легитимные запросы от пользователей)
+    // Для top_only используем более строгий лимит (так как это может быть кэшировано)
+    const rateLimitKey = userId 
+      ? `referral_data:user:${userId}` 
+      : `referral_data:ip:${getClientIP(request)}`
+    
+    const maxRequests = userId 
+      ? SECURITY_CONFIG.RATE_LIMIT_MAX_REQUESTS // 60 запросов в минуту для пользователей
+      : Math.floor(SECURITY_CONFIG.RATE_LIMIT_MAX_REQUESTS / 3) // 20 для запросов без user_id
+    
     const rateLimitResult = rateLimit({ 
-      maxRequests: Math.floor(SECURITY_CONFIG.RATE_LIMIT_MAX_REQUESTS / 3), // Строже для публичного endpoint
+      maxRequests: maxRequests,
       windowMs: SECURITY_CONFIG.RATE_LIMIT_WINDOW_MS,
-      keyGenerator: (req) => `referral_data:${getClientIP(req)}`
+      keyGenerator: () => rateLimitKey
     })(request)
     if (rateLimitResult) {
       // Добавляем CORS заголовки к ответу rate limiting
@@ -39,9 +54,7 @@ export async function GET(request: NextRequest) {
       return rateLimitResult
     }
 
-    const { searchParams } = new URL(request.url)
-    let userId = searchParams.get('user_id')
-    const topOnly = searchParams.get('top_only') === 'true'
+    // userId и topOnly уже получены выше для rate limiting
     
     const clientIP = getClientIP(request)
     const userAgent = request.headers.get('user-agent') || ''
