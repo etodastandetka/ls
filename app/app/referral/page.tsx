@@ -415,6 +415,25 @@ export default function ReferralPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Закрытие контекстного меню при клике вне его
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu) {
+        setContextMenu(null)
+      }
+    }
+
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside)
+      document.addEventListener('contextmenu', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('contextmenu', handleClickOutside)
+    }
+  }, [contextMenu])
+
   // Не показываем контент, пока проверяется авторизация
   if (isAuthorized === null || isAuthorized === false) {
     return null
@@ -575,25 +594,6 @@ export default function ReferralPage() {
       setDeletingReferral(null)
     }
   }
-
-  // Закрытие контекстного меню при клике вне его
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (contextMenu) {
-        setContextMenu(null)
-      }
-    }
-
-    if (contextMenu) {
-      document.addEventListener('click', handleClickOutside)
-      document.addEventListener('contextmenu', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('click', handleClickOutside)
-      document.removeEventListener('contextmenu', handleClickOutside)
-    }
-  }, [contextMenu])
 
   return (
     <>
