@@ -811,9 +811,12 @@ export default function ReferralPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <h2 className="text-lg font-semibold text-white/90">Ваши рефералы</h2>
+            <span className="text-sm text-white/60">({referralsList.length})</span>
           </div>
           
-          <div className="space-y-3">
+          {/* Контейнер с фиксированной высотой и прокруткой */}
+          <div className="max-h-[400px] md:max-h-[500px] overflow-y-auto pr-2 -mr-2 referral-list-scroll">
+            <div className="space-y-3">
             {referralsList.map((ref: any) => {
               const hasDeposits = (ref.deposits_count || 0) > 0
               const isDeleting = deletingReferral === ref.referred_id
@@ -860,6 +863,7 @@ export default function ReferralPage() {
                 </div>
               )
             })}
+            </div>
           </div>
         </section>
       )}
@@ -1078,6 +1082,24 @@ export default function ReferralPage() {
       .referral-prizes-scroll::-webkit-scrollbar-thumb {
         background: linear-gradient(90deg, rgba(52, 211, 153, 0.8), rgba(16, 185, 129, 0.8));
         border-radius: 999px;
+      }
+      .referral-list-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(52, 211, 153, 0.6) rgba(255, 255, 255, 0.08);
+      }
+      .referral-list-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+      .referral-list-scroll::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 999px;
+      }
+      .referral-list-scroll::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(52, 211, 153, 0.8), rgba(16, 185, 129, 0.8));
+        border-radius: 999px;
+      }
+      .referral-list-scroll::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(52, 211, 153, 1), rgba(16, 185, 129, 1));
       }
     `}</style>
     </>

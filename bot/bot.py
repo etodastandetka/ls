@@ -640,42 +640,90 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     if referrer_id == user_id:
                         logger.warning(f"⚠️ Пользователь {user_id} пытается пригласить самого себя")
                     else:
-                        # Регистрируем реферальную связь через API
+                        # Регистрируем реферальную связь через API с повторными попытками
                         logger.info(f"🔄 Регистрация реферала: {referrer_id} -> {user_id}")
-                        try:
-                            async with httpx.AsyncClient(timeout=10.0) as client:
-                                response = await client.post(
-                                    f"{API_URL}/api/referral/register",
-                                    json={
-                                        "referrer_id": str(referrer_id),
-                                        "referred_id": str(user_id),
-                                        "username": user.username,
-                                        "first_name": user.first_name,
-                                        "last_name": user.last_name
-                                    },
-                                    headers={"Content-Type": "application/json"}
-                                )
-                                
-                                logger.info(f"📡 Ответ API: статус {response.status_code}")
-                                
-                                if response.status_code == 200:
-                                    data = response.json()
-                                    logger.info(f"📋 Данные ответа: {data}")
-                                    if data.get('success'):
-                                        logger.info(f"✅ Реферальная связь зарегистрирована: {referrer_id} -> {user_id}")
+                        
+                        # Параметры для повторных попыток
+                        max_retries = 3
+                        retry_delay = 2  # секунды между попытками
+                        timeout = 15.0  # увеличенный таймаут
+                        success = False
+                        
+                        for attempt in range(max_retries):
+                            try:
+                                async with httpx.AsyncClient(timeout=timeout) as client:
+                                    response = await client.post(
+                                        f"{API_URL}/api/referral/register",
+                                        json={
+                                            "referrer_id": str(referrer_id),
+                                            "referred_id": str(user_id),
+                                            "username": user.username,
+                                            "first_name": user.first_name,
+                                            "last_name": user.last_name
+                                        },
+                                        headers={"Content-Type": "application/json"}
+                                    )
+                                    
+                                    logger.info(f"📡 Ответ API (попытка {attempt + 1}/{max_retries}): статус {response.status_code}")
+                                    
+                                    if response.status_code == 200:
+                                        try:
+                                            data = response.json()
+                                            logger.info(f"📋 Данные ответа: {data}")
+                                            if data.get('success'):
+                                                logger.info(f"✅ Реферальная связь зарегистрирована: {referrer_id} -> {user_id}")
+                                                success = True
+                                                break
+                                            else:
+                                                error_msg = data.get('error', 'Unknown error')
+                                                # Если это не временная ошибка (например, уже привязан), не повторяем
+                                                if 'already referred' in error_msg.lower() or 'cannot refer yourself' in error_msg.lower():
+                                                    logger.warning(f"⚠️ Не удалось зарегистрировать реферала: {error_msg}")
+                                                    break
+                                                logger.warning(f"⚠️ Не удалось зарегистрировать реферала (попытка {attempt + 1}): {error_msg}")
+                                        except Exception as parse_error:
+                                            logger.warning(f"⚠️ Ошибка парсинга ответа (попытка {attempt + 1}): {parse_error}")
+                                            # Пробуем еще раз при ошибке парсинга
                                     else:
-                                        error_msg = data.get('error', 'Unknown error')
-                                        logger.warning(f"⚠️ Не удалось зарегистрировать реферала: {error_msg}")
+                                        try:
+                                            error_text = response.text
+                                            logger.error(f"❌ Ошибка API при регистрации реферала (попытка {attempt + 1}): {response.status_code} - {error_text[:200]}")
+                                            # Если это 429 (rate limit) или 5xx ошибка, повторяем
+                                            if response.status_code == 429 or response.status_code >= 500:
+                                                if attempt < max_retries - 1:
+                                                    logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
+                                                    await asyncio.sleep(retry_delay)
+                                                    continue
+                                        except:
+                                            logger.error(f"❌ Ошибка API при регистрации реферала (попытка {attempt + 1}): {response.status_code}")
+                                    
+                                    # Если не успешно и это не последняя попытка, ждем перед повтором
+                                    if attempt < max_retries - 1:
+                                        logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
+                                        await asyncio.sleep(retry_delay)
+                                        
+                            except httpx.TimeoutException:
+                                logger.error(f"❌ Таймаут при регистрации реферала (попытка {attempt + 1}/{max_retries}, превышено {timeout} секунд)")
+                                if attempt < max_retries - 1:
+                                    logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
+                                    await asyncio.sleep(retry_delay)
                                 else:
-                                    try:
-                                        error_text = response.text
-                                        logger.error(f"❌ Ошибка API при регистрации реферала: {response.status_code} - {error_text[:200]}")
-                                    except:
-                                        logger.error(f"❌ Ошибка API при регистрации реферала: {response.status_code}")
-                        except httpx.TimeoutException:
-                            logger.error(f"❌ Таймаут при регистрации реферала (превышено 10 секунд)")
-                        except Exception as e:
-                            logger.error(f"❌ Ошибка при регистрации реферала: {e}", exc_info=True)
+                                    logger.error(f"❌ Все попытки регистрации реферала исчерпаны из-за таймаута")
+                            except httpx.NetworkError as e:
+                                logger.error(f"❌ Сетевая ошибка при регистрации реферала (попытка {attempt + 1}/{max_retries}): {e}")
+                                if attempt < max_retries - 1:
+                                    logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
+                                    await asyncio.sleep(retry_delay)
+                                else:
+                                    logger.error(f"❌ Все попытки регистрации реферала исчерпаны из-за сетевой ошибки")
+                            except Exception as e:
+                                logger.error(f"❌ Ошибка при регистрации реферала (попытка {attempt + 1}/{max_retries}): {e}", exc_info=True)
+                                if attempt < max_retries - 1:
+                                    logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
+                                    await asyncio.sleep(retry_delay)
+                        
+                        if not success:
+                            logger.error(f"❌ Не удалось зарегистрировать реферала после {max_retries} попыток: {referrer_id} -> {user_id}")
                 except ValueError as e:
                     logger.warning(f"⚠️ Неверный формат реферального кода '{referral_code}': {e}")
     
