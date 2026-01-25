@@ -108,23 +108,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Получаем настройки букмекеров (депозиты и выводы)
-    let bookmakerSettings = settingsMap.bookmaker_settings || {
+    // Дефолтные значения для всех букмекеров
+    const defaultBookmakerSettings = {
       '1xbet': { deposit_enabled: true, withdraw_enabled: true },
       '1win': { deposit_enabled: true, withdraw_enabled: true },
       melbet: { deposit_enabled: true, withdraw_enabled: true },
       mostbet: { deposit_enabled: true, withdraw_enabled: true },
-      winwin: { deposit_enabled: true, withdraw_enabled: true }
+      winwin: { deposit_enabled: true, withdraw_enabled: true },
+      '888starz': { deposit_enabled: true, withdraw_enabled: true }
+    }
+    
+    // Мержим настройки из базы с дефолтными (если настройка не определена, используем дефолт)
+    let bookmakerSettings: Record<string, { deposit_enabled: boolean; withdraw_enabled: boolean }> = { ...defaultBookmakerSettings }
+    if (settingsMap.bookmaker_settings && typeof settingsMap.bookmaker_settings === 'object') {
+      // Для каждого букмекера мержим настройки
+      Object.keys(defaultBookmakerSettings).forEach((key) => {
+        const bookmakerKey = key as keyof typeof defaultBookmakerSettings
+        if (settingsMap.bookmaker_settings[bookmakerKey]) {
+          bookmakerSettings[bookmakerKey] = {
+            deposit_enabled: settingsMap.bookmaker_settings[bookmakerKey].deposit_enabled !== false,
+            withdraw_enabled: settingsMap.bookmaker_settings[bookmakerKey].withdraw_enabled !== false
+          }
+        }
+      })
     }
 
     // Если пользователь админ - всегда включаем депозиты и выводы для всех букмекеров
     if (isAdmin) {
-      bookmakerSettings = {
-        '1xbet': { deposit_enabled: true, withdraw_enabled: true },
-        '1win': { deposit_enabled: true, withdraw_enabled: true },
-        melbet: { deposit_enabled: true, withdraw_enabled: true },
-        mostbet: { deposit_enabled: true, withdraw_enabled: true },
-        winwin: { deposit_enabled: true, withdraw_enabled: true }
-      }
+      bookmakerSettings = { ...defaultBookmakerSettings }
     }
 
     // Формируем ответ в формате, который ожидает клиентский сайт

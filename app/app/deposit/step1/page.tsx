@@ -224,6 +224,7 @@ export default function DepositStep1() {
         // Проверяем настройки букмекеров для депозитов
         if (data && data.bookmaker_settings) {
           const bookmakerSettings = data.bookmaker_settings
+          // Проверяем строго: если deposit_enabled === false, отключаем
           if (bookmakerSettings['1xbet']?.deposit_enabled === false) disabled.push('1xbet')
           if (bookmakerSettings['1win']?.deposit_enabled === false) disabled.push('1win')
           if (bookmakerSettings['melbet']?.deposit_enabled === false) disabled.push('melbet')
@@ -232,7 +233,9 @@ export default function DepositStep1() {
           if (bookmakerSettings['888starz']?.deposit_enabled === false) disabled.push('888starz')
         }
         
-        setDisabledCasinos(disabled)
+        // Убираем дубликаты
+        const uniqueDisabled = [...new Set(disabled)]
+        setDisabledCasinos(uniqueDisabled)
       } catch (error) {
         console.error('Error loading settings:', error)
       }

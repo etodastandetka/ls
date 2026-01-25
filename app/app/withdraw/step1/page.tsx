@@ -195,6 +195,7 @@ export default function WithdrawStep1() {
         // Проверяем настройки букмекеров для выводов
         if (data && data.bookmaker_settings) {
           const bookmakerSettings = data.bookmaker_settings
+          // Проверяем строго: если withdraw_enabled === false, отключаем
           if (bookmakerSettings['1xbet']?.withdraw_enabled === false) disabled.push('1xbet')
           if (bookmakerSettings['1win']?.withdraw_enabled === false) disabled.push('1win')
           if (bookmakerSettings['melbet']?.withdraw_enabled === false) disabled.push('melbet')
@@ -203,7 +204,9 @@ export default function WithdrawStep1() {
           if (bookmakerSettings['888starz']?.withdraw_enabled === false) disabled.push('888starz')
         }
         
-        setDisabledCasinos(disabled)
+        // Убираем дубликаты
+        const uniqueDisabled = [...new Set(disabled)]
+        setDisabledCasinos(uniqueDisabled)
       } catch (error) {
         console.error('Error loading settings:', error)
       }
