@@ -79,16 +79,18 @@ export async function POST(request: NextRequest) {
       return errorResponse
     }
 
-    // 🔄 Автоматическая корректировка копеек для избежания конфликтов
-    // ВАЖНО: Если сумма уже содержит копейки (от клиентского сайта), проверяем только на конфликт
-    // Если копеек нет (от бота), генерируем их автоматически
-    const hasCents = amount % 1 !== 0 // Проверяем, есть ли копейки (остаток от деления на 1)
+    // 🔄 ВСЕГДА генерируем случайные копейки, игнорируя копейки пользователя
+    // Это защита от скама - пользователь не может передать точную сумму с копейками
+    const baseAmount = Math.floor(amount) // Берем только целую часть, игнорируя копейки пользователя
     const MAX_ATTEMPTS = 10
     let adjustedAmount = amount
     let attempts = 0
-    const originalAmount = amount
     
     while (attempts < MAX_ATTEMPTS) {
+      // Генерируем случайные копейки (от 1 до 99)
+      const randomCents = Math.floor(Math.random() * 99) + 1
+      adjustedAmount = baseAmount + (randomCents / 100)
+      
       // Проверяем, есть ли активная заявка с такой же суммой
       const existingRequest = await prisma.request.findFirst({
         where: {
@@ -105,30 +107,18 @@ export async function POST(request: NextRequest) {
       
       if (!existingRequest) {
         // Сумма свободна, используем её
-        if (adjustedAmount !== originalAmount) {
-          console.log(`✅ [Generate QR] Amount adjusted: ${originalAmount} → ${adjustedAmount} (to avoid conflict)`)
-        }
+        console.log(`🎲 [Generate QR] Generated random cents: ${randomCents} (${amount} → ${adjustedAmount})`)
         amount = adjustedAmount
         break
       }
       
-      // Сумма занята
-      // Если копейки уже были (от клиентского сайта), просто увеличиваем на 0.01
-      // Если копеек не было (от бота), генерируем рандомные копейки
+      // Сумма занята, пробуем другую комбинацию копеек
       attempts++
-      if (hasCents) {
-        // Копейки уже есть - просто увеличиваем на 0.01
-        adjustedAmount = Math.round((adjustedAmount + 0.01) * 100) / 100
-      } else {
-        // Копеек не было - генерируем рандомные (от 0.01 до 0.99)
-        const randomCents = Math.floor(Math.random() * 99) + 1
-        adjustedAmount = Math.floor(originalAmount) + (randomCents / 100)
-        console.log(`🎲 [Generate QR] Generated random cents: ${randomCents} (${originalAmount} → ${adjustedAmount})`)
-      }
     }
     
     if (attempts >= MAX_ATTEMPTS) {
-      console.warn(`⚠️ [Generate QR] Could not find free amount after ${MAX_ATTEMPTS} attempts, using last checked: ${adjustedAmount}`)
+      // Если не удалось найти свободную сумму, просто используем последнюю сгенерированную
+      console.warn(`⚠️ [Generate QR] Could not find free amount after ${MAX_ATTEMPTS} attempts, using last generated: ${adjustedAmount}`)
       amount = adjustedAmount
     }
     
