@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Токен бота
-BOT_TOKEN = "8042108386:AAFGNVTTfrMy-KwHjxOA72Gd_iV-Bgy5u4U"
+BOT_TOKEN = "8237362899:AAECnIbU7QQaFUonr85eiosXU79f9SbBc5s"
 
 # URL сайта
 WEBSITE_URL = "https://lux-on.org"
