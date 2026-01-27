@@ -121,11 +121,14 @@ function ReferralWithdrawStep2Content() {
       const tg = (window as any).Telegram?.WebApp
       const telegramUser = getTelegramUser()
       
+      // Нормализуем сумму до 2 знаков после запятой для избежания проблем с округлением
+      const normalizedAmount = Math.round(availableBalance * 100) / 100
+      
       const requestBody = {
         user_id: userId,
         bookmaker: bookmaker,
         account_id: accountId.trim(),
-        amount: availableBalance, // Выводим весь баланс
+        amount: normalizedAmount, // Выводим весь баланс (нормализованный)
         telegram_data: {
           username: telegramUser?.username || tg?.initDataUnsafe?.user?.username || null,
           first_name: telegramUser?.first_name || tg?.initDataUnsafe?.user?.first_name || null,

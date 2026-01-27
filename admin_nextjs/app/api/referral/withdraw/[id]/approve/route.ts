@@ -67,11 +67,18 @@ export async function POST(
     const availableBalance = totalEarned - totalWithdrawn
     const requestAmount = parseFloat(withdrawalRequest.amount.toString())
     
+    // Нормализуем суммы для корректного сравнения (округляем до 2 знаков после запятой)
+    // Это устраняет проблемы с погрешностями округления с плавающей точкой
+    const normalizedAvailableBalance = Math.round(availableBalance * 100) / 100
+    const normalizedRequestAmount = Math.round(requestAmount * 100) / 100
+    
     // Проверяем, достаточно ли средств
-    if (availableBalance < requestAmount) {
+    // Используем небольшой epsilon (0.01) для учета погрешностей округления
+    const EPSILON = 0.01
+    if (normalizedAvailableBalance < normalizedRequestAmount - EPSILON) {
       return NextResponse.json({
         success: false,
-        error: `Недостаточно средств для вывода. Доступно: ${availableBalance.toFixed(2)} сом, запрошено: ${requestAmount.toFixed(2)} сом`
+        error: `Недостаточно средств для вывода. Доступно: ${normalizedAvailableBalance.toFixed(2)} сом, запрошено: ${normalizedRequestAmount.toFixed(2)} сом`
       }, { status: 400 })
     }
     

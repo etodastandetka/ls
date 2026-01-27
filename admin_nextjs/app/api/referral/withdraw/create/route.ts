@@ -123,11 +123,18 @@ export async function POST(request: NextRequest) {
       return errorResponse
     }
     
+    // Нормализуем суммы для корректного сравнения (округляем до 2 знаков после запятой)
+    // Это устраняет проблемы с погрешностями округления с плавающей точкой
+    const normalizedAmount = Math.round(amount * 100) / 100
+    const normalizedAvailableBalance = Math.round(availableBalance * 100) / 100
+    
     // Проверяем, что запрашиваемая сумма не превышает доступный баланс
-    if (amount > availableBalance) {
+    // Используем небольшой epsilon (0.01) для учета погрешностей округления
+    const EPSILON = 0.01
+    if (normalizedAmount > normalizedAvailableBalance + EPSILON) {
       const errorResponse = NextResponse.json({
         success: false,
-        error: `Недостаточно средств. Доступно: ${availableBalance.toFixed(2)} сом`
+        error: `Недостаточно средств. Доступно: ${normalizedAvailableBalance.toFixed(2)} сом`
       }, { status: 400 })
       errorResponse.headers.set('Access-Control-Allow-Origin', '*')
       return errorResponse
