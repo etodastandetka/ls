@@ -2,8 +2,48 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
 import { getMiniAppUrl } from '@/config/domains'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 export const dynamic = 'force-dynamic'
+
+// Загружаем переменные из .env файла (если не загружены)
+function loadEnvFile() {
+  try {
+    const envPath = join(process.cwd(), '.env')
+    const envContent = readFileSync(envPath, 'utf-8')
+    const lines = envContent.split('\n')
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim()
+      // Пропускаем комментарии и пустые строки
+      if (!trimmedLine || trimmedLine.startsWith('#')) continue
+      
+      const match = trimmedLine.match(/^([^=]+)=(.*)$/)
+      if (match) {
+        const key = match[1].trim()
+        let value = match[2].trim()
+        
+        // Убираем кавычки если есть
+        if ((value.startsWith('"') && value.endsWith('"')) || 
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1)
+        }
+        
+        // Устанавливаем переменную окружения только если она еще не установлена
+        if (!process.env[key]) {
+          process.env[key] = value
+        }
+      }
+    }
+  } catch (error) {
+    // Если .env файл не найден, это нормально - используем системные переменные
+    console.log('⚠️ [Broadcast] .env file not found, using system environment variables')
+  }
+}
+
+// Загружаем .env перед использованием
+loadEnvFile()
 
 // Отправка рассылки всем пользователям (поддерживает текст и фото)
 export async function POST(request: NextRequest) {
@@ -99,7 +139,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const botToken = process.env.BOT_TOKEN
+    // Получаем токен из переменных окружения или используем токен основного бота
+    let botToken = process.env.BOT_TOKEN
+    
+    // Fallback на токен основного бота, если не найден в .env
+    if (!botToken) {
+      botToken = '8237362899:AAECnIbU7QQaFUonr85eiosXU79f9SbBc5s'
+      console.log('⚠️ [Broadcast] BOT_TOKEN not found in .env, using default token from bot_1xbet')
+    }
 
     console.log(`🔑 [Broadcast] BOT_TOKEN check: ${botToken ? 'exists' : 'missing'}, length: ${botToken?.length || 0}`)
 
