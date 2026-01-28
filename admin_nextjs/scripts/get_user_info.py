@@ -416,7 +416,8 @@ def print_user_info(info: Dict[str, Any]):
     print("=" * 80)
     if requests:
         for r in requests:
-            print(f"  • #{r['id']} | {r['type']} | {r['bookmaker'] or 'N/A'} | {r['amount']:.2f if r['amount'] else 'N/A'} сом | {r['status']} | {r['created_at']}")
+            amount_str = f"{r['amount']:.2f}" if r['amount'] is not None else "N/A"
+            print(f"  • #{r['id']} | {r['type']} | {r['bookmaker'] or 'N/A'} | {amount_str} сом | {r['status']} | {r['created_at']}")
             if r['processed_by']:
                 print(f"    Обработано: {r['processed_by']}")
     else:
