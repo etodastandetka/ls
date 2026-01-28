@@ -50,10 +50,17 @@ def get_db_connection():
         sys.exit(1)
     
     try:
+        # Убираем параметр schema из URL, так как psycopg2 его не поддерживает
+        # Формат Prisma: postgresql://user:pass@host:port/db?schema=public
+        # Формат psycopg2: postgresql://user:pass@host:port/db
+        if '?' in database_url:
+            database_url = database_url.split('?')[0]
+        
         conn = psycopg2.connect(database_url)
         return conn
     except Exception as e:
         print(f"❌ Ошибка подключения к базе данных: {e}")
+        print(f"   DATABASE_URL (первые 50 символов): {database_url[:50]}...")
         sys.exit(1)
 
 
