@@ -20,7 +20,7 @@ export default function FaqPage(){
       commissionQuestion: 'Есть ли комиссия?',
       commissionAnswer: 'Нет, мы не берем комиссию за пополнения и выводы.',
       limitsQuestion: 'Какие лимиты?',
-      limitsAnswer: 'Минимальная сумма пополнения: 35 сом, максимальная: 100,000 сом. Минимальная сумма вывода: 100 сом, максимальная: 500,000 сом.',
+      limitsAnswer: 'Минимальная сумма пополнения: 35 сом, максимальная: 500,000 сом. Минимальная сумма вывода: 100 сом, без ограничений.',
       supportQuestion: 'Как связаться с поддержкой?',
       supportAnswer: 'Напишите в поддержку: @operator_luxon_bot. Мы отвечаем в течение 5-15 минут.'
     },
@@ -35,7 +35,7 @@ export default function FaqPage(){
       commissionQuestion: 'Is there a commission?',
       commissionAnswer: 'No, we don\'t charge commission for deposits and withdrawals.',
       limitsQuestion: 'What are the limits?',
-      limitsAnswer: 'Minimum deposit: 35 som, maximum: 100,000 som. Minimum withdrawal: 100 som, maximum: 500,000 som.',
+      limitsAnswer: 'Minimum deposit: 35 som, maximum: 500,000 som. Minimum withdrawal: 100 som, no limit.',
       supportQuestion: 'How to contact support?',
       supportAnswer: 'Write to support: @operator_luxon_bot. We respond within 5-15 minutes.'
     },
@@ -50,7 +50,7 @@ export default function FaqPage(){
       commissionQuestion: 'Комиссия барбы?',
       commissionAnswer: 'Жок, биз депозит жана чыгаруу үчүн комиссия албайбыз.',
       limitsQuestion: 'Лимиттер кандай?',
-      limitsAnswer: 'Эң аз депозит суммасы: 35 сом, эң көп: 100,000 сом. Эң аз чыгаруу суммасы: 100 сом, эң көп: 500,000 сом.',
+      limitsAnswer: 'Эң аз депозит суммасы: 35 сом, эң көп: 500,000 сом. Эң аз чыгаруу суммасы: 100 сом, чектөө жок.',
       supportQuestion: 'Колдоого кантип байланышуу?',
       supportAnswer: 'Колдоого жазыңыз: @operator_luxon_bot. Биз 5-15 мүнөт ичинде жооп беребиз.'
     },
@@ -65,7 +65,7 @@ export default function FaqPage(){
       commissionQuestion: 'Komissiya bormi?',
       commissionAnswer: 'Yo\'q, biz depozit va chiqarish uchun komissiya olmaymiz.',
       limitsQuestion: 'Limitlar qanday?',
-      limitsAnswer: 'Minimal depozit: 35 som, maksimal: 100,000 som. Minimal chiqarish: 100 som, maksimal: 500,000 som.',
+      limitsAnswer: 'Minimal depozit: 35 som, maksimal: 500,000 som. Minimal chiqarish: 100 som, cheklov yo\'q.',
       supportQuestion: 'Qanday qo\'llab-quvvatlash bilan bog\'lanish?',
       supportAnswer: 'Qo\'llab-quvvatlashga yozing: @operator_luxon_bot. Biz 5-15 daqiqa ichida javob beramiz.'
     }

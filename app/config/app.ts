@@ -13,6 +13,6 @@ export const DEPOSIT_CONFIG = {
   MIN_AMOUNT: parseFloat(process.env.MIN_DEPOSIT_AMOUNT || '35'),
   
   // Максимальная сумма депозита
-  MAX_AMOUNT: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '100000'),
+  MAX_AMOUNT: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '500000'),
 } as const
 

@@ -161,7 +161,7 @@ function DepositStep2Content() {
   const [accountId, setAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [minAmount, setMinAmount] = useState(35)
-  const [maxAmount, setMaxAmount] = useState(100000)
+  const [maxAmount, setMaxAmount] = useState(500000)
   const [checkingId, setCheckingId] = useState(false)
   const [idValid, setIdValid] = useState<boolean | null>(null)
   const [bookmaker, setBookmaker] = useState('')

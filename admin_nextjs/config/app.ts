@@ -88,7 +88,7 @@ export const DEPOSIT_CONFIG = {
   MIN_DEPOSIT_AMOUNT_MOSTBET: parseFloat(process.env.MIN_DEPOSIT_AMOUNT_MOSTBET || '400'),
   
   // Максимальная сумма депозита
-  MAX_DEPOSIT_AMOUNT: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '100000'),
+  MAX_DEPOSIT_AMOUNT: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '500000'),
   
   // Время на оплату депозита (в секундах)
   DEPOSIT_TIMEOUT_SECONDS: parseInt(process.env.DEPOSIT_TIMEOUT_SECONDS || '300', 10), // 5 минут

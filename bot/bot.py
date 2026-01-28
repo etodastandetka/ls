@@ -306,9 +306,9 @@ TRANSLATIONS = {
         'waiting_money': "Ожидайте поступление денег. Ваша заявка будет обработана в ближайшее время.",
         'deposit_amount_prompt': "Введите сумму пополнения:",
         'min_amount_deposit': "Минимум: 35 KGS",
-        'max_amount_deposit': "Максимум: 100 000 KGS",
+        'max_amount_deposit': "Максимум: 500 000 KGS",
         'invalid_amount_format': "❌ Введите корректную сумму (число) или выберите из кнопок",
-        'amount_range_error': "❌ Сумма должна быть от 35 до 100,000 сом",
+        'amount_range_error': "❌ Сумма должна быть от 35 до 500,000 сом",
         'invalid_player_id_format': "❌ Введите корректный ID игрока (только цифры)",
         'invalid_code_empty': "❌ Введите код подтверждения",
         'select_bank_for_payment': "Выберите способ оплаты:",
@@ -332,7 +332,7 @@ TRANSLATIONS = {
         'withdraw_check_timeout': "⚠️ Не удалось проверить сумму вывода. Попробуйте еще раз.",
         'server_unavailable': "❌ Сервер недоступен. Пожалуйста, убедитесь, что админ-панель запущена.",
         'request_creation_error': "❌ Ошибка создания заявки. Попробуйте еще раз.",
-        'amount_range_error_deposit': "❌ Сумма должна быть от 35 до 100,000 сом",
+        'amount_range_error_deposit': "❌ Сумма должна быть от 35 до 500,000 сом",
         'invalid_amount_format_deposit': "❌ Введите корректную сумму (число) или выберите из кнопок",
     }
 }
@@ -1257,7 +1257,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 min_amount_value = 400
             else:
                 min_amount_value = 35
-            max_amount_value = 100000
+            max_amount_value = 500000
             min_amount = get_text('min_amount', min=min_amount_value)
             max_amount = f"Максимум: {max_amount_value:,} KGS".replace(',', ' ')
             await update.message.reply_text(
@@ -1289,7 +1289,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 min_amount_value = 400
             else:
                 min_amount_value = 35
-            max_amount_value = 100000
+            max_amount_value = 500000
             if amount < min_amount_value or amount > max_amount_value:
                 logger.warning(f"⚠️ Сумма вне диапазона: {amount}")
                 await update.message.reply_text(

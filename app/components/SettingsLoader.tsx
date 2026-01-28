@@ -24,9 +24,9 @@ const FALLBACK_SETTINGS: BotSettings = {
   supported_bookmakers: ['1xBet', 'Melbet', 'Mostbet', '1Win', 'Winwin', '888starz'],
   supported_banks: ['DemirBank', 'O! bank', 'Balance.kg', 'Bakai', 'MegaPay', 'MBank'],
   min_deposit: 35,
-  max_deposit: 100000,
+  max_deposit: 500000,
   min_withdraw: 100,
-  max_withdraw: 500000,
+  max_withdraw: 50000, // Ограничение вывода убрано, но оставляем значение для совместимости
   referral_percentage: 5,
   support_contact: '@operator_luxon_bot'
 }
