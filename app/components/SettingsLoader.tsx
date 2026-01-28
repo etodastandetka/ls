@@ -26,7 +26,7 @@ const FALLBACK_SETTINGS: BotSettings = {
   min_deposit: 35,
   max_deposit: 100000,
   min_withdraw: 100,
-  max_withdraw: 50000,
+  max_withdraw: 500000,
   referral_percentage: 5,
   support_contact: '@operator_luxon_bot'
 }

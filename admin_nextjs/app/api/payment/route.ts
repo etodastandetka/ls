@@ -422,6 +422,10 @@ export async function POST(request: NextRequest) {
         if (normalizedBookmaker.includes('1win') || normalizedBookmaker === '1win') {
           minDeposit = DEPOSIT_CONFIG.MIN_DEPOSIT_AMOUNT_1WIN
         }
+        // Для Mostbet минимальный депозит 400
+        else if (normalizedBookmaker.includes('mostbet') || normalizedBookmaker === 'mostbet') {
+          minDeposit = DEPOSIT_CONFIG.MIN_DEPOSIT_AMOUNT_MOSTBET
+        }
         
         if (finalAmount < minDeposit) {
           const errorResponse = NextResponse.json(

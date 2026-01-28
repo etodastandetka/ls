@@ -1250,7 +1250,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             deposit_title = get_text('deposit_title')
             deposit_amount_prompt = get_text('deposit_amount_prompt')
-            min_amount_value = 100 if data.get('bookmaker') == '1win' else 35
+            bookmaker = data.get('bookmaker', '').lower()
+            if bookmaker == '1win':
+                min_amount_value = 100
+            elif bookmaker == 'mostbet':
+                min_amount_value = 400
+            else:
+                min_amount_value = 35
             max_amount_value = 100000
             min_amount = get_text('min_amount', min=min_amount_value)
             max_amount = f"Максимум: {max_amount_value:,} KGS".replace(',', ' ')
@@ -1276,7 +1282,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     return
             
             logger.info(f"💰 Сумма распознана: {amount}")
-            min_amount_value = 100 if data.get('bookmaker') == '1win' else 35
+            bookmaker = data.get('bookmaker', '').lower()
+            if bookmaker == '1win':
+                min_amount_value = 100
+            elif bookmaker == 'mostbet':
+                min_amount_value = 400
+            else:
+                min_amount_value = 35
             max_amount_value = 100000
             if amount < min_amount_value or amount > max_amount_value:
                 logger.warning(f"⚠️ Сумма вне диапазона: {amount}")

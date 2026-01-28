@@ -299,10 +299,19 @@ function DepositStep2Content() {
         if (data && data.deposits) {
           if (data.deposits.min_amount !== undefined) {
             const apiMinAmount = data.deposits.min_amount
-            const resolvedMinAmount = bookmaker === '1win' ? 100 : apiMinAmount
+            let resolvedMinAmount = apiMinAmount
+            if (bookmaker === '1win') {
+              resolvedMinAmount = 100
+            } else if (bookmaker === 'mostbet') {
+              resolvedMinAmount = 400
+            }
             setMinAmount(resolvedMinAmount)
-          } else if (bookmaker === '1win') {
-            setMinAmount(100)
+          } else {
+            if (bookmaker === '1win') {
+              setMinAmount(100)
+            } else if (bookmaker === 'mostbet') {
+              setMinAmount(400)
+            }
           }
           if (data.deposits.max_amount !== undefined) {
             setMaxAmount(data.deposits.max_amount)
@@ -312,6 +321,8 @@ function DepositStep2Content() {
         console.error('Error loading deposit settings:', error)
         if (bookmaker === '1win') {
           setMinAmount(100)
+        } else if (bookmaker === 'mostbet') {
+          setMinAmount(400)
         }
       }
     }

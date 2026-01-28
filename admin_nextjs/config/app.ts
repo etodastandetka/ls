@@ -84,6 +84,9 @@ export const DEPOSIT_CONFIG = {
   // Минимальная сумма депозита для 1win
   MIN_DEPOSIT_AMOUNT_1WIN: parseFloat(process.env.MIN_DEPOSIT_AMOUNT_1WIN || '100'),
   
+  // Минимальная сумма депозита для Mostbet
+  MIN_DEPOSIT_AMOUNT_MOSTBET: parseFloat(process.env.MIN_DEPOSIT_AMOUNT_MOSTBET || '400'),
+  
   // Максимальная сумма депозита
   MAX_DEPOSIT_AMOUNT: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '100000'),
   
