@@ -440,18 +440,19 @@ export async function POST(request: NextRequest) {
           return errorResponse
         }
         
-        if (finalAmount > DEPOSIT_CONFIG.MAX_DEPOSIT_AMOUNT) {
-          const errorResponse = NextResponse.json(
-            createApiResponse(null, `Максимальная сумма депозита: ${DEPOSIT_CONFIG.MAX_DEPOSIT_AMOUNT} сом`),
-            { 
-              status: 400,
-              headers: {
-                'Access-Control-Allow-Origin': '*',
-              }
-            }
-          )
-          return errorResponse
-        }
+        // Убрана проверка на максимальную сумму депозита - разрешаем до 500к
+        // if (finalAmount > DEPOSIT_CONFIG.MAX_DEPOSIT_AMOUNT) {
+        //   const errorResponse = NextResponse.json(
+        //     createApiResponse(null, `Максимальная сумма депозита: ${DEPOSIT_CONFIG.MAX_DEPOSIT_AMOUNT} сом`),
+        //     { 
+        //       status: 400,
+        //       headers: {
+        //         'Access-Control-Allow-Origin': '*',
+        //       }
+        //     }
+        //   )
+        //   return errorResponse
+        // }
 
         // 🔄 Автоматическая корректировка копеек для избежания конфликтов
         // ВАЖНО: Если сумма уже содержит копейки (от клиентского сайта), проверяем только на конфликт
@@ -499,13 +500,13 @@ export async function POST(request: NextRequest) {
             console.log(`🎲 [Payment API] Generated random cents: ${randomCents} (${finalAmount} → ${adjustedAmount})`)
           }
           
-          // Проверяем, не превысили ли максимальную сумму
-          if (adjustedAmount > DEPOSIT_CONFIG.MAX_DEPOSIT_AMOUNT) {
-            console.warn(`⚠️ [Payment API] Cannot adjust amount ${finalAmount}: all variants exceed max deposit`)
-            // Используем последнюю проверенную сумму
-            finalAmount = adjustedAmount - 0.01
-            break
-          }
+          // Убрана проверка на максимальную сумму - разрешаем до 500к
+          // if (adjustedAmount > DEPOSIT_CONFIG.MAX_DEPOSIT_AMOUNT) {
+          //   console.warn(`⚠️ [Payment API] Cannot adjust amount ${finalAmount}: all variants exceed max deposit`)
+          //   // Используем последнюю проверенную сумму
+          //   finalAmount = adjustedAmount - 0.01
+          //   break
+          // }
         }
         
         if (attempts >= MAX_ATTEMPTS) {
