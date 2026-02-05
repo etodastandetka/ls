@@ -14,11 +14,8 @@ bash setup.sh
 ### Запуск через PM2 (рекомендуется)
 
 ```bash
-# Создаем директорию для логов
-mkdir -p logs
-
-# Запускаем бота
-pm2 start ecosystem.config.js
+# Запуск бота одной командой
+pm2 start bot.py --name luxon-bot --interpreter venv/bin/python --cwd /var/www/luxon/bot_new
 
 # Просмотр статуса
 pm2 status
