@@ -5,6 +5,7 @@
 import logging
 import os
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 try:
@@ -16,23 +17,41 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-def get_casino_id_image_path(bookmaker: str) -> str:
+def get_casino_id_image_path(bookmaker: str) -> Optional[str]:
     """Возвращает путь к изображению с примером ID для казино"""
     if not bookmaker:
         return None
     
     bookmaker_lower = bookmaker.lower()
-    image_map = {
-        '1xbet': 'images/1xbet-id.jpg',
-        '1win': 'images/1win-id.jpg',
-        'melbet': 'images/melbet-id.jpg',
-        'mostbet': 'images/mostbet-id.jpg',
-        'winwin': 'images/winwin.png',
+    
+    # Определяем базовую директорию (на уровень выше bot_new)
+    current_file = Path(__file__).resolve()
+    base_dir = current_file.parent.parent  # Из utils/ поднимаемся в LUXON/
+    images_dir = base_dir / 'images'
+    
+    # Формируем имя файла: {casino}-id.jpg
+    image_filename = f"{bookmaker_lower}-id.jpg"
+    image_path = images_dir / image_filename
+    
+    # Проверяем существование файла
+    if image_path.exists():
+        return str(image_path)
+    
+    # Если не нашли, пробуем альтернативные варианты
+    alternative_names = {
+        '1xbet': '1xbet-id.jpg',
+        '1win': '1win-id.jpg',
+        'melbet': 'melbet-id.jpg',
+        'mostbet': 'mostbet-id.jpg',
+        'winwin': 'winwin.png',  # winwin может быть .png
     }
     
-    image_path = image_map.get(bookmaker_lower)
-    if image_path and os.path.exists(image_path):
-        return image_path
+    if bookmaker_lower in alternative_names:
+        alt_path = images_dir / alternative_names[bookmaker_lower]
+        if alt_path.exists():
+            return str(alt_path)
+    
+    logger.warning(f"⚠️ Не найден файл с примером ID для казино {bookmaker} в {images_dir}")
     return None
 
 async def generate_qr_image(qr_url: str, bookmaker: str = '') -> Optional[BytesIO]:
