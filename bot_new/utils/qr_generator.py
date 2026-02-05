@@ -26,7 +26,8 @@ def get_casino_id_image_path(bookmaker: str) -> Optional[str]:
     
     # Определяем базовую директорию (на уровень выше bot_new)
     current_file = Path(__file__).resolve()
-    base_dir = current_file.parent.parent  # Из utils/ поднимаемся в LUXON/
+    # Из utils/qr_generator.py -> utils/ -> bot_new/ -> LUXON/
+    base_dir = current_file.parent.parent.parent  # Поднимаемся на 3 уровня до LUXON/
     images_dir = base_dir / 'images'
     
     # Формируем имя файла: {casino}-id.jpg
