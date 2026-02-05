@@ -69,6 +69,29 @@ async def start_deposit(message: Message, state: FSMContext):
         except Exception as deposit_check_error:
             logger.error(f"❌ Ошибка при проверке депозитов: {deposit_check_error}")
         
+        # Проверяем, есть ли у пользователя активная заявка на пополнение
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"{Config.API_URL}/api/public/check-pending-deposit",
+                    params={
+                        "userId": str(user_id)
+                    },
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('success') and result.get('data'):
+                        has_pending = result.get('data', {}).get('hasPending', False)
+                        if has_pending:
+                            # У пользователя есть активная заявка на пополнение
+                            await message.answer("⚠️ У вас есть ожидающая заявка на пополнение. Дождитесь обработки текущей заявки перед созданием новой.")
+                            return
+        except Exception as check_error:
+            logger.warning(f"⚠️ Не удалось проверить активные заявки: {check_error}")
+            # Продолжаем работу, если проверка не удалась
+        
         # Начинаем диалог пополнения
         try:
             user_states[user_id] = {
