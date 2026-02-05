@@ -22,7 +22,8 @@ _load_env_file(_root_dir / "admin" / ".env")
 _load_env_file(_root_dir / "admin_nextjs" / ".env")
 
 class Config:
-    BOT_TOKEN = "8502647763:AAEaHMQpwzeFbUN4Hq1ZCq42CagkPFMgADo"  # Токен бота
+    # Токен бота из .env файла (admin_nextjs/.env)
+    BOT_TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN") or "8502647763:AAEaHMQpwzeFbUN4Hq1ZCq42CagkPFMgADo"
     WEBSITE_URL = os.getenv("MINI_APP_URL", "https://lux-on.org")
     API_URL = os.getenv("ADMIN_PUBLIC_URL", os.getenv("NEXT_PUBLIC_API_URL", "https://pipiska.net"))
     SUPPORT_BOT_URL = os.getenv("SUPPORT_BOT_URL", "https://t.me/operator_luxon_bot")
