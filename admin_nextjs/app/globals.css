@@ -82,3 +82,21 @@ body {
   }
 }
 
+/* Мобильная оптимизация для клавиатуры */
+@supports (padding: max(0px)) {
+  .safe-area-inset-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Улучшение скролла на мобильных */
+.overscroll-contain {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Оптимизация для touch устройств */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+

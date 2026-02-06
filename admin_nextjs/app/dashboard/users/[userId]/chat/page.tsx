@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { CHAT_CONFIG } from '@/config/app'
+import { getSocketClient, disconnectSocket } from '@/lib/socket-client'
 
 interface ReplyTo {
   id: number
@@ -122,12 +123,62 @@ export default function ChatPage() {
     
     fetchChatData()
     
-    // Обновляем чат с интервалом из конфигурации
-    const interval = setInterval(() => {
-      fetchChatData()
-    }, CHAT_CONFIG.REFRESH_INTERVAL_MS)
-    
-    return () => clearInterval(interval)
+    // Подключаемся к Socket.IO
+    const socket = getSocketClient()
+    if (socket) {
+      // Подписываемся на события для этого пользователя
+      socket.emit('subscribe:user', params.userId)
+      
+      // Обработчики событий
+      const handleNewMessage = (data: any) => {
+        const newMessage = data.data || data
+        if (newMessage.userId === params.userId) {
+          setMessages(prev => {
+            // Проверяем, нет ли уже такого сообщения
+            if (prev.find(m => m.id === newMessage.id)) {
+              return prev
+            }
+            return [...prev, newMessage]
+          })
+        }
+      }
+      
+      const handleEditMessage = (data: any) => {
+        const editedMessage = data.data || data
+        if (editedMessage.userId === params.userId) {
+          setMessages(prev => prev.map(msg => 
+            msg.id === editedMessage.id ? { ...msg, ...editedMessage } : msg
+          ))
+        }
+      }
+      
+      const handleDeleteMessage = (data: any) => {
+        const deletedMessage = data.data || data
+        if (deletedMessage.userId === params.userId) {
+          setMessages(prev => prev.map(msg => 
+            msg.id === deletedMessage.id ? { ...msg, isDeleted: true } : msg
+          ))
+        }
+      }
+      
+      socket.on('message:new', handleNewMessage)
+      socket.on('message:edit', handleEditMessage)
+      socket.on('message:delete', handleDeleteMessage)
+      
+      return () => {
+        socket.emit('unsubscribe:user', params.userId)
+        socket.off('message:new', handleNewMessage)
+        socket.off('message:edit', handleEditMessage)
+        socket.off('message:delete', handleDeleteMessage)
+      }
+    } else {
+      // Fallback на polling, если Socket.IO недоступен
+      const interval = setInterval(() => {
+        fetchChatData()
+      }, CHAT_CONFIG.REFRESH_INTERVAL_MS)
+      
+      return () => clearInterval(interval)
+    }
   }, [params.userId, fetchChatData])
 
   useEffect(() => {
@@ -146,8 +197,24 @@ export default function ChatPage() {
       }, 300)
     }
 
+    const handleVisualViewportChange = () => {
+      // Обработка изменения визуального viewport (клавиатура на мобильных)
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+    }
+
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange)
+    }
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange)
+      }
+    }
   }, [scrollToBottom])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,12 +412,13 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div className="flex flex-col h-full max-h-full">
+      <div className="flex flex-col h-screen max-h-screen overflow-hidden">
         {/* Хедер */}
-        <div className="flex items-center justify-between p-4 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-800 border-b border-gray-700 flex-shrink-0">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-700 active:bg-gray-600 rounded-lg transition-colors touch-manipulation"
+            type="button"
           >
             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -388,7 +456,8 @@ export default function ChatPage() {
         {/* Сообщения */}
         <div 
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-green-950 to-green-900 min-h-0"
+          className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-green-950 to-green-900 min-h-0 overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {messages.length === 0 ? (
             <div className="text-center text-gray-400 py-12">
@@ -416,14 +485,14 @@ export default function ChatPage() {
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group`}
+                  className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group animate-fadeIn`}
                 >
                   <div className="relative">
                     <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl transition-all duration-200 ${
                         isOutgoing
-                          ? 'bg-green-500 text-black'
-                          : 'bg-gray-700 text-white'
+                          ? 'bg-green-500 text-black hover:bg-green-600'
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
                       }`}
                     >
                       {/* Ответ на сообщение */}
@@ -507,16 +576,18 @@ export default function ChatPage() {
                             className="w-full bg-gray-800 text-white rounded px-2 py-1 text-sm"
                             autoFocus
                           />
-                          <div className="flex space-x-2 text-xs">
+                          <div className="flex gap-2 text-xs">
                             <button
                               onClick={() => editMessage(message.id, (document.querySelector('input[type="text"]') as HTMLInputElement)?.value || '')}
-                              className="text-green-400 hover:text-green-300"
+                              className="text-green-400 hover:text-green-300 active:opacity-70 touch-manipulation"
+                              type="button"
                             >
                               Сохранить
                             </button>
                             <button
                               onClick={() => setEditingMessageId(null)}
-                              className="text-gray-400 hover:text-gray-300"
+                              className="text-gray-400 hover:text-gray-300 active:opacity-70 touch-manipulation"
+                              type="button"
                             >
                               Отмена
                             </button>
@@ -533,18 +604,20 @@ export default function ChatPage() {
                               {message.editedAt && ' (изменено)'}
                             </p>
                             {isOutgoing && (
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1 ml-2">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 ml-2">
                                 <button
                                   onClick={() => setEditingMessageId(message.id)}
-                                  className="text-xs hover:underline"
+                                  className="text-xs hover:underline active:opacity-70 touch-manipulation"
                                   title="Редактировать"
+                                  type="button"
                                 >
                                   ✏️
                                 </button>
                                 <button
                                   onClick={() => deleteMessage(message.id)}
-                                  className="text-xs hover:underline"
+                                  className="text-xs hover:underline active:opacity-70 touch-manipulation"
                                   title="Удалить"
+                                  type="button"
                                 >
                                   🗑️
                                 </button>
@@ -576,7 +649,7 @@ export default function ChatPage() {
         </div>
 
         {/* Поле ввода */}
-        <div className="p-4 bg-gray-800 border-t border-gray-700 flex-shrink-0 relative z-10">
+        <div className="p-3 sm:p-4 bg-gray-800 border-t border-gray-700 flex-shrink-0 relative z-10 safe-area-inset-bottom">
           {/* Preview ответа */}
           {replyingToId && (() => {
             const replyToMessage = messages.find(m => m.id === replyingToId)
@@ -588,7 +661,8 @@ export default function ChatPage() {
                 </div>
                 <button
                   onClick={() => setReplyingToId(null)}
-                  className="ml-2 p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-colors"
+                  className="ml-2 p-1 text-gray-400 hover:text-white hover:bg-gray-600 active:bg-gray-500 rounded transition-colors touch-manipulation"
+                  type="button"
                 >
                   ✕
                 </button>
@@ -609,7 +683,8 @@ export default function ChatPage() {
                   />
                   <button
                     onClick={removeFile}
-                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
+                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-full p-1 touch-manipulation"
+                    type="button"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -625,7 +700,8 @@ export default function ChatPage() {
                   />
                   <button
                     onClick={removeFile}
-                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
+                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-full p-1 touch-manipulation"
+                    type="button"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -635,7 +711,7 @@ export default function ChatPage() {
               ) : null}
             </div>
           )}
-          <div className="flex items-end space-x-2">
+          <div className="flex items-end gap-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -645,19 +721,21 @@ export default function ChatPage() {
             />
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
+              className="p-2 hover:bg-gray-700 active:bg-gray-600 rounded-lg transition-colors flex-shrink-0 touch-manipulation"
               title="Прикрепить файл"
+              type="button"
             >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </button>
             <button
               onClick={() => setShowTemplates(!showTemplates)}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0 relative"
+              className="p-2 hover:bg-gray-700 active:bg-gray-600 rounded-lg transition-colors flex-shrink-0 relative touch-manipulation"
               title="Шаблоны ответов"
+              type="button"
             >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               {showTemplates && templates.length > 0 && (
@@ -666,12 +744,13 @@ export default function ChatPage() {
                   {templates.map((template) => (
                     <button
                       key={template.id}
-                  onClick={() => {
-                    setNewMessage(template.text || template.content || '')
-                    setShowTemplates(false)
-                    inputRef.current?.focus()
-                  }}
-                      className="w-full p-3 text-left hover:bg-gray-700 transition-colors border-b border-gray-700/50 last:border-0"
+                      onClick={() => {
+                        setNewMessage(template.text || template.content || '')
+                        setShowTemplates(false)
+                        inputRef.current?.focus()
+                      }}
+                      className="w-full p-3 text-left hover:bg-gray-700 active:bg-gray-600 transition-colors border-b border-gray-700/50 last:border-0 touch-manipulation"
+                      type="button"
                     >
                       <div className="text-sm text-white font-medium">{template.title}</div>
                       {template.category && (
@@ -695,15 +774,19 @@ export default function ChatPage() {
                 }
               }}
               placeholder="Введите сообщение..."
-              className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="flex-1 bg-gray-700 text-white rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-green-500 min-w-0"
               disabled={sending}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
             />
             <button
               onClick={sendMessage}
               disabled={sending || (!newMessage.trim() && !selectedFile)}
-              className="p-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              className="p-2 bg-green-500 hover:bg-green-600 active:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 touch-manipulation"
+              type="button"
             >
-              <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>

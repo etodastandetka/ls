@@ -75,7 +75,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )
     },
     { 
-      href: '/dashboard/operator-chat', 
+      href: '/dashboard/chat', 
       label: 'ЧАТ', 
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,9 +115,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen bg-gradient-to-b from-green-950 to-green-900 flex justify-center items-center overflow-hidden">
-      <div className="mobile-container w-full max-w-[414px] h-full">
+      <div className="mobile-container w-full max-w-[414px] h-full flex flex-col">
         {/* Основной контент */}
-        <main className={`px-4 py-4 bg-transparent overflow-y-auto h-full ${isChatPage ? 'pb-4' : 'pb-20'}`}>
+        <main className={`px-4 py-4 bg-transparent overflow-y-auto flex-1 ${isChatPage ? 'pb-4' : 'pb-20'} overscroll-contain`} style={{ WebkitOverflowScrolling: 'touch' }}>
           {children}
         </main>
 

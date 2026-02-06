@@ -133,6 +133,18 @@ async def handle_other_messages(message: Message, state: FSMContext):
                 return
             message_text = sanitize_input(message_text)
         
+        # Проверяем, является ли это первым сообщением, и отправляем приветствие
+        try:
+            from utils.greeting import check_is_first_message, send_greeting
+            from bot import bot
+            
+            is_first = await check_is_first_message(user_id)
+            if is_first:
+                logger.info(f"👋 Первое сообщение от пользователя {user_id}, отправляю приветствие")
+                await send_greeting(bot, user_id, message.from_user.first_name)
+        except Exception as greeting_error:
+            logger.warning(f"⚠️ Ошибка при проверке/отправке приветствия (не критично): {greeting_error}")
+        
         # Сохраняем сообщение в админку через API (неблокирующе)
         try:
             message_type = 'text'

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { emitToUser } from '@/lib/socket-server'
 
 // Редактирование сообщения
 export async function PATCH(
@@ -89,6 +90,22 @@ export async function PATCH(
       }
     }
 
+    // Отправляем событие через Socket.IO
+    try {
+      emitToUser(resolvedParams.userId, 'message:edit', {
+        id: updated.id,
+        userId: resolvedParams.userId,
+        messageText: updated.messageText,
+        messageType: updated.messageType,
+        direction: updated.direction,
+        mediaUrl: updated.mediaUrl,
+        editedAt: updated.editedAt?.toISOString(),
+        createdAt: updated.createdAt.toISOString(),
+      })
+    } catch (socketError) {
+      console.warn('⚠️ Failed to emit Socket.IO event:', socketError)
+    }
+
     return NextResponse.json(
       createApiResponse({
         success: true,
@@ -167,6 +184,17 @@ export async function DELETE(
           // Продолжаем, даже если не удалось удалить в Telegram
         }
       }
+    }
+
+    // Отправляем событие через Socket.IO
+    try {
+      emitToUser(resolvedParams.userId, 'message:delete', {
+        id: updated.id,
+        userId: resolvedParams.userId,
+        isDeleted: true,
+      })
+    } catch (socketError) {
+      console.warn('⚠️ Failed to emit Socket.IO event:', socketError)
     }
 
     return NextResponse.json(

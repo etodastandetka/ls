@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/prisma'
+import { emitToUser } from '@/lib/socket-server'
 import fs from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -260,6 +261,21 @@ export async function POST(
       } else {
         throw error
       }
+    }
+
+    // Отправляем событие через Socket.IO
+    try {
+      emitToUser(resolvedParams.userId, 'message:new', {
+        id: saved.id,
+        userId: resolvedParams.userId,
+        messageText: saved.messageText,
+        messageType: saved.messageType,
+        direction: saved.direction,
+        mediaUrl: saved.mediaUrl,
+        createdAt: saved.createdAt.toISOString(),
+      })
+    } catch (socketError) {
+      console.warn('⚠️ Failed to emit Socket.IO event:', socketError)
     }
 
     return NextResponse.json(

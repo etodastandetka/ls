@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { emitToUser } from '@/lib/socket-server'
 
 // Публичный эндпоинт для сохранения входящих сообщений от пользователя (вызывается ботом)
 export async function POST(
@@ -112,6 +113,21 @@ export async function POST(
     }
 
     console.log(`✅ Chat ingest: Сообщение сохранено в БД с ID ${message.id}, direction='in'`)
+
+    // Отправляем событие через Socket.IO
+    try {
+      emitToUser(userId.toString(), 'message:new', {
+        id: message.id,
+        userId: userId.toString(),
+        messageText: message.messageText,
+        messageType: message.messageType,
+        direction: message.direction,
+        mediaUrl: message.mediaUrl,
+        createdAt: message.createdAt.toISOString(),
+      })
+    } catch (socketError) {
+      console.warn('⚠️ Failed to emit Socket.IO event:', socketError)
+    }
 
     return NextResponse.json({
       success: true,
