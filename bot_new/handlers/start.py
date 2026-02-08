@@ -116,7 +116,8 @@ async def send_main_menu(message_or_chat_id, user_name: str = "", bot_instance=N
             chat_id=chat_id, 
             text=main_menu_text_with_emoji, 
             reply_markup=inline_keyboard,
-            entities=main_menu_entities if main_menu_entities else None
+            entities=main_menu_entities if main_menu_entities else None,
+            parse_mode=None  # Отключаем parse_mode при использовании entities
         )
         logger.info(f"✅ Inline меню отправлено")
     except Exception as e:
@@ -128,7 +129,8 @@ async def send_main_menu(message_or_chat_id, user_name: str = "", bot_instance=N
             chat_id=chat_id, 
             text=menu_ready_text_with_emoji, 
             reply_markup=get_main_menu_keyboard(),
-            entities=menu_ready_entities if menu_ready_entities else None
+            entities=menu_ready_entities if menu_ready_entities else None,
+            parse_mode=None  # Отключаем parse_mode при использовании entities
         )
         logger.info(f"✅ Клавиатура отправлена")
     except Exception as e:
