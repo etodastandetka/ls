@@ -235,6 +235,20 @@ async def process_bookmaker(message: Message, state: FSMContext):
     enter_player_id = get_text('enter_player_id')
     
     message_text = f"{deposit_title}\n\n{casino_label}\n\n{enter_player_id}"
+    text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
+    
+    # Объединяем entities
+    all_entities = list(title_entities) if title_entities else []
+    if entities:
+        for entity in entities:
+            overlaps = False
+            if title_entities:
+                for t_entity in title_entities:
+                    if max(entity.offset, t_entity.offset) < min(entity.offset + entity.length, t_entity.offset + t_entity.length):
+                        overlaps = True
+                        break
+            if not overlaps:
+                all_entities.append(entity)
     
     # Пытаемся отправить фото с примером ID
     casino_image_path = get_casino_id_image_path(bookmaker)
@@ -242,12 +256,28 @@ async def process_bookmaker(message: Message, state: FSMContext):
         try:
             from aiogram.types import FSInputFile
             photo = FSInputFile(casino_image_path)
-            await message.answer_photo(photo=photo, caption=message_text, reply_markup=reply_markup)
+            await message.answer_photo(
+                photo=photo, 
+                caption=text_with_emoji, 
+                caption_entities=all_entities if all_entities else None,
+                reply_markup=reply_markup,
+                parse_mode=None
+            )
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отправить фото ID казино {bookmaker}: {e}")
-            await message.answer(message_text, reply_markup=reply_markup)
+            await message.answer(
+                text_with_emoji, 
+                reply_markup=reply_markup,
+                entities=all_entities if all_entities else None,
+                parse_mode=None
+            )
     else:
-        await message.answer(message_text, reply_markup=reply_markup)
+        await message.answer(
+            text_with_emoji, 
+            reply_markup=reply_markup,
+            entities=all_entities if all_entities else None,
+            parse_mode=None
+        )
 
 @router.message(DepositStates.player_id)
 async def process_player_id(message: Message, state: FSMContext):
@@ -297,7 +327,7 @@ async def process_player_id(message: Message, state: FSMContext):
     
     reply_markup = get_amount_keyboard()
     
-    deposit_title = get_text('deposit_title')
+    deposit_title_text, title_entities = get_text_with_premium_emoji('deposit_title')
     deposit_amount_prompt = get_text('deposit_amount_prompt')
     bookmaker = user_states[user_id]['data'].get('bookmaker', '').lower()
     if bookmaker == '1win':
@@ -309,7 +339,27 @@ async def process_player_id(message: Message, state: FSMContext):
     max_amount_value = 500000
     min_amount = get_text('min_amount', min=min_amount_value)
     max_amount = f"Максимум: {max_amount_value:,} KGS".replace(',', ' ')
-    await message.answer(f"{deposit_title}\n\n{min_amount}\n{max_amount}\n\n{deposit_amount_prompt}", reply_markup=reply_markup)
+    amount_text = f"{deposit_title_text}\n\n{min_amount}\n{max_amount}\n\n{deposit_amount_prompt}"
+    text_with_emoji, entities = add_premium_emoji_to_text(amount_text, Config.PREMIUM_EMOJI_MAP)
+    
+    all_entities = list(title_entities) if title_entities else []
+    if entities:
+        for entity in entities:
+            overlaps = False
+            if title_entities:
+                for t_entity in title_entities:
+                    if max(entity.offset, t_entity.offset) < min(entity.offset + entity.length, t_entity.offset + t_entity.length):
+                        overlaps = True
+                        break
+            if not overlaps:
+                all_entities.append(entity)
+    
+    await message.answer(
+        text_with_emoji, 
+        reply_markup=reply_markup,
+        entities=all_entities if all_entities else None,
+        parse_mode=None
+    )
 
 @router.message(DepositStates.amount)
 async def process_amount(message: Message, state: FSMContext):
