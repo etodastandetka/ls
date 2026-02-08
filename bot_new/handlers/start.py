@@ -261,6 +261,8 @@ async def cmd_start(message: Message, state: FSMContext):
                                                 data = response.json()
                                                 if data.get('success'):
                                                     logger.info(f"✅ Реферальная связь зарегистрирована: {referrer_id} -> {user_id}")
+                                                    # Уведомления отправляются автоматически через API endpoint
+                                                    # Здесь просто отмечаем успех
                                                     success = True
                                                     break
                                                 else:

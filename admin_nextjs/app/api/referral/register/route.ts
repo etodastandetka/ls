@@ -254,7 +254,16 @@ export async function POST(request: NextRequest) {
           select: {
             userId: true,
             username: true,
-            firstName: true
+            firstName: true,
+            lastName: true
+          }
+        },
+        referrer: {
+          select: {
+            userId: true,
+            username: true,
+            firstName: true,
+            lastName: true
           }
         }
       }
@@ -271,6 +280,69 @@ export async function POST(request: NextRequest) {
         username: verifyReferral.referred.username
       } : 'null'
     })
+    
+    // Отправляем уведомления через Telegram
+    const botToken = process.env.BOT_TOKEN
+    if (botToken) {
+      // Получаем имена пользователей для уведомлений
+      const referredName = verifyReferral?.referred 
+        ? (verifyReferral.referred.firstName || verifyReferral.referred.username || `ID: ${verifyReferral.referred.userId}`)
+        : (firstName || username || `ID: ${referredIdBigInt}`)
+      
+      const referrerName = verifyReferral?.referrer
+        ? (verifyReferral.referrer.firstName || verifyReferral.referrer.username || `ID: ${verifyReferral.referrer.userId}`)
+        : 'пользователь'
+      
+      // Уведомление рефереру (тому, кто пригласил)
+      try {
+        const referrerMessage = `🎉 <b>Новый реферал!</b>\n\nПо вашей реферальной ссылке зашел <b>${referredName}</b>.\n\nТеперь вы будете получать процент с его депозитов!`
+        
+        const referrerResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: referrerIdBigInt.toString(),
+            text: referrerMessage,
+            parse_mode: 'HTML'
+          })
+        })
+        
+        if (referrerResponse.ok) {
+          console.log(`✅ [Referral Register] Уведомление отправлено рефереру ${referrerIdBigInt}`)
+        } else {
+          const errorData = await referrerResponse.json()
+          console.warn(`⚠️ [Referral Register] Не удалось отправить уведомление рефереру: ${errorData.description || 'Unknown error'}`)
+        }
+      } catch (error) {
+        console.error(`❌ [Referral Register] Ошибка при отправке уведомления рефереру:`, error)
+      }
+      
+      // Уведомление новому пользователю (рефералу)
+      try {
+        const referredMessage = `✅ <b>Реферальная программа</b>\n\nВы успешно стали рефералом <b>${referrerName}</b>.\n\nТеперь вы можете приглашать друзей и получать бонусы!`
+        
+        const referredResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: referredIdBigInt.toString(),
+            text: referredMessage,
+            parse_mode: 'HTML'
+          })
+        })
+        
+        if (referredResponse.ok) {
+          console.log(`✅ [Referral Register] Уведомление отправлено рефералу ${referredIdBigInt}`)
+        } else {
+          const errorData = await referredResponse.json()
+          console.warn(`⚠️ [Referral Register] Не удалось отправить уведомление рефералу: ${errorData.description || 'Unknown error'}`)
+        }
+      } catch (error) {
+        console.error(`❌ [Referral Register] Ошибка при отправке уведомления рефералу:`, error)
+      }
+    } else {
+      console.warn('⚠️ [Referral Register] BOT_TOKEN не настроен, уведомления не отправлены')
+    }
     
     const response = NextResponse.json({
       success: true,
