@@ -82,7 +82,7 @@ async def setup_handlers():
 
 # Обработчик ошибок
 @dp.errors()
-async def error_handler(event, exception):
+async def error_handler(update, exception):
     """Обработчик ошибок"""
     error_str = str(exception)
     
@@ -95,8 +95,10 @@ async def error_handler(event, exception):
     
     # Пытаемся отправить сообщение пользователю об ошибке
     try:
-        if hasattr(event, 'event') and hasattr(event.event, 'chat'):
-            await event.event.answer("❌ Произошла ошибка. Попробуйте позже или напишите /start")
+        if update and hasattr(update, 'message') and update.message:
+            await update.message.answer("❌ Произошла ошибка. Попробуйте позже или напишите /start")
+        elif update and hasattr(update, 'callback_query') and update.callback_query:
+            await update.callback_query.answer("❌ Произошла ошибка. Попробуйте позже.", show_alert=True)
     except Exception as e:
         if "bot was blocked by the user" not in str(e).lower():
             logger.error(f"❌ Не удалось отправить сообщение об ошибке: {e}")

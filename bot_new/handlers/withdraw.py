@@ -217,7 +217,7 @@ async def process_withdraw_phone(message: Message, state: FSMContext):
     
     reply_markup = get_cancel_keyboard()
     casino_name = get_casino_name(user_states[user_id]['data'].get('bookmaker', ''))
-    withdraw_title = get_text('withdraw_title')
+    withdraw_title, title_entities = get_text_with_premium_emoji('withdraw_title')
     casino_label = get_text('casino_label', casino_name=casino_name)
     phone_label = get_text('phone_label', phone=phone)
     send_qr = get_text('send_qr_code')
@@ -225,7 +225,14 @@ async def process_withdraw_phone(message: Message, state: FSMContext):
     text_with_emoji, entities = add_premium_emoji_to_text(menu_text, Config.PREMIUM_EMOJI_MAP)
     all_entities = list(title_entities) if title_entities else []
     if entities:
-        all_entities.extend(entities)
+        for entity in entities:
+            overlaps = False
+            if title_entities:
+                title_end = max(e.offset + e.length for e in title_entities) if title_entities else 0
+                if entity.offset < title_end:
+                    overlaps = True
+            if not overlaps:
+                all_entities.append(entity)
     await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
 
 @router.message(WithdrawStates.qr_photo, F.photo | F.document)
