@@ -30,6 +30,16 @@ class Config:
     PENDING_DEPOSIT_STATE_FILE = Path(__file__).parent / 'pending_deposit_states.json'
     DEPOSIT_TIMEOUT_SECONDS = 300  # 5 минут
     
+    # Премиум эмодзи (custom_emoji_id)
+    # Получить ID можно через @BotFather или из сообщений с премиум эмодзи
+    # Формат: {"обычный_эмодзи": "custom_emoji_id"}
+    PREMIUM_EMOJI_MAP = {
+        # Примеры (замените на реальные ID):
+        # "💰": "1234567890123456789",
+        # "💸": "9876543210987654321",
+        # "✨": "1111111111111111111",
+    }
+    
     BANK_NAMES = {
         'kompanion': 'Компаньон',
         'demirbank': 'DemirBank',
@@ -50,4 +60,3 @@ class Config:
         'winwin': 'WINWIN',
         '888starz': '888STARZ'
     }
-
