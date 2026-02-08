@@ -117,13 +117,18 @@ async def start_deposit(message: Message, state: FSMContext):
             
             reply_markup = get_casino_keyboard(enabled_casinos)
             
-            deposit_title = get_text('deposit_title')
+            deposit_title, title_entities = get_text_with_premium_emoji('deposit_title')
             select_casino = get_text('select_casino')
-            await message.answer(f"{deposit_title}\n\n{select_casino}", reply_markup=reply_markup)
+            menu_text = f"{deposit_title}\n\n{select_casino}"
+            text_with_emoji, entities = add_premium_emoji_to_text(menu_text, Config.PREMIUM_EMOJI_MAP)
+            all_entities = list(title_entities) if title_entities else []
+            if entities:
+                all_entities.extend(entities)
+            await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
         except Exception as e:
             logger.error(f"❌ Ошибка при начале депозита для пользователя {user_id}: {e}", exc_info=True)
             try:
-                await message.answer("❌ Произошла ошибка. Попробуйте еще раз или напишите /start")
+                await answer_with_custom_text(message, "❌ Произошла ошибка. Попробуйте еще раз или напишите /start")
             except:
                 pass
     except Exception as main_error:
@@ -146,7 +151,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     # Определяем казино по тексту кнопки
@@ -161,7 +166,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
     
     bookmaker = bookmaker_map.get(message_text)
     if not bookmaker:
-        await message.answer(get_text('please_select_from_buttons'))
+        await answer_with_text(message, 'please_select_from_buttons')
         return
     
     # Проверяем настройки букмекера
@@ -175,7 +180,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
     
     if not bookmaker_deposit_enabled:
         casino_name = get_casino_name(bookmaker)
-        await message.answer(f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.")
+        await answer_with_custom_text(message, f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.")
         return
     
     user_states[user_id]['data']['bookmaker'] = bookmaker
@@ -247,11 +252,11 @@ async def process_player_id(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     if not message_text.strip().isdigit():
-        await message.answer(get_text('invalid_player_id_format'))
+        await answer_with_text(message, 'invalid_player_id_format')
         return
     
     player_id = message_text.strip()
@@ -309,7 +314,7 @@ async def process_amount(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     # Проверяем сумму
@@ -319,7 +324,7 @@ async def process_amount(message: Message, state: FSMContext):
         try:
             amount = float(message_text.replace(',', '.').strip())
         except ValueError:
-            await message.answer(get_text('invalid_amount_format_deposit'))
+            await answer_with_text(message, 'invalid_amount_format_deposit')
             return
     
     bookmaker = user_states[user_id]['data'].get('bookmaker', '').lower()
@@ -332,7 +337,7 @@ async def process_amount(message: Message, state: FSMContext):
     max_amount_value = 500000
     
     if amount < min_amount_value or amount > max_amount_value:
-        await message.answer(f"❌ Сумма должна быть от {min_amount_value} до {max_amount_value:,} сом".replace(',', ' '))
+        await answer_with_custom_text(message, f"❌ Сумма должна быть от {min_amount_value} до {max_amount_value:,} сом".replace(',', ' '))
         return
     
     # Добавляем случайные копейки
@@ -347,7 +352,13 @@ async def process_amount(message: Message, state: FSMContext):
     
     # Отправляем сообщение о генерации QR (очищаем клавиатуру)
     from aiogram.types import ReplyKeyboardRemove
-    generating_message = await message.answer(f"⏳ {get_text('qr_generating')}", reply_markup=ReplyKeyboardRemove())
+    qr_text, qr_entities = get_text_with_premium_emoji('qr_generating')
+    generating_text = f"⏳ {qr_text}"
+    text_with_emoji, entities = add_premium_emoji_to_text(generating_text, Config.PREMIUM_EMOJI_MAP)
+    all_entities = list(qr_entities) if qr_entities else []
+    if entities:
+        all_entities.extend(entities)
+    generating_message = await message.answer(text_with_emoji, reply_markup=ReplyKeyboardRemove(), entities=all_entities if all_entities else None)
     
     # Получаем QR ссылки
     try:
@@ -388,7 +399,7 @@ async def process_amount(message: Message, state: FSMContext):
                     
                     if not reply_markup.inline_keyboard or len(reply_markup.inline_keyboard) == 0:
                         await generating_message.delete()
-                        await message.answer("❌ Не удалось получить ссылки для оплаты. Обратитесь в поддержку.")
+                        await answer_with_custom_text(message, "❌ Не удалось получить ссылки для оплаты. Обратитесь в поддержку.")
                         return
                     
                     # Генерируем QR-код
@@ -458,11 +469,11 @@ async def process_amount(message: Message, state: FSMContext):
                     return
                 else:
                     await generating_message.delete()
-                    await message.answer("❌ Ошибка при получении ссылок на оплату. Попробуйте еще раз.")
+                    await answer_with_custom_text(message, "❌ Ошибка при получении ссылок на оплату. Попробуйте еще раз.")
                     return
             else:
                 await generating_message.delete()
-                await message.answer("❌ Ошибка при получении ссылок на оплату. Попробуйте еще раз.")
+                await answer_with_custom_text(message, "❌ Ошибка при получении ссылок на оплату. Попробуйте еще раз.")
                 return
     except Exception as e:
         logger.error(f"❌ Ошибка при создании заявки или получении ссылок: {e}")
@@ -470,7 +481,7 @@ async def process_amount(message: Message, state: FSMContext):
             await generating_message.delete()
         except:
             pass
-        await message.answer("❌ Ошибка при создании заявки. Попробуйте еще раз или обратитесь в поддержку.")
+        await answer_with_custom_text(message, "❌ Ошибка при создании заявки. Попробуйте еще раз или обратитесь в поддержку.")
 
 @router.message(DepositStates.bank, F.photo | F.document)
 @router.message(DepositStates.receipt_photo, F.photo | F.document)
@@ -487,7 +498,7 @@ async def process_receipt_photo(message: Message, state: FSMContext):
     # Проверяем, что фото отправлено в правильном состоянии
     current_state = await state.get_state()
     if current_state not in [DepositStates.bank, DepositStates.receipt_photo]:
-        await message.answer("❌ Сейчас не требуется отправка фото. Следуйте инструкциям выше.")
+        await answer_with_custom_text(message, "❌ Сейчас не требуется отправка фото. Следуйте инструкциям выше.")
         return
     
     if user_id not in user_states:
@@ -508,7 +519,7 @@ async def process_receipt_photo(message: Message, state: FSMContext):
                 await state.set_state(DepositStates.receipt_photo)
             else:
                 clear_pending_deposit_state(user_id)
-                await message.answer("❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново.")
+                await answer_with_custom_text(message, "❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново.")
                 return
         else:
             await message.answer("❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново.")
@@ -522,14 +533,16 @@ async def process_receipt_photo(message: Message, state: FSMContext):
         photo_file_id = message.document.file_id
     
     if not photo_file_id:
-        await message.answer(get_text('please_send_receipt'))
+        await answer_with_text(message, 'please_send_receipt')
         return
     
     # Останавливаем таймер
     cancel_timer(user_id)
     
     # Получаем фото в base64
-    processing_message = await message.answer("⏳ Обрабатываю фото чека и создаю заявку...")
+    processing_text = "⏳ Обрабатываю фото чека и создаю заявку..."
+    text_with_emoji, entities = add_premium_emoji_to_text(processing_text, Config.PREMIUM_EMOJI_MAP)
+    processing_message = await message.answer(text_with_emoji, entities=entities if entities else None)
     try:
         from bot import bot
         from io import BytesIO
@@ -544,7 +557,7 @@ async def process_receipt_photo(message: Message, state: FSMContext):
         data = user_states[user_id]['data']
         
         if not data.get('amount') or not data.get('player_id') or not data.get('bookmaker'):
-            await message.answer("❌ Ошибка: отсутствуют данные. Начните заново.")
+            await answer_with_custom_text(message, "❌ Ошибка: отсутствуют данные. Начните заново.")
             if user_id in user_states:
                 del user_states[user_id]
             clear_pending_deposit_state(user_id)
@@ -611,14 +624,14 @@ async def process_receipt_photo(message: Message, state: FSMContext):
                     await state.clear()
                 else:
                     error_msg = result.get('error') or result.get('message') or 'Неизвестная ошибка'
-                    await message.answer(get_text('error_creating_request', error=error_msg))
+                    await answer_with_text(message, 'error_creating_request', error=error_msg)
             else:
                 result = payment_response.json() if payment_response.headers.get('content-type', '').startswith('application/json') else {}
                 error_msg = result.get('error') or result.get('message') or payment_response.text[:200] or f'HTTP {payment_response.status_code}'
-                await message.answer(get_text('error_creating_request', error=error_msg))
+                await answer_with_text(message, 'error_creating_request', error=error_msg)
     except Exception as e:
         logger.error(f"❌ Ошибка при обработке фото чека: {e}", exc_info=True)
-        await message.answer(get_text('error_processing_photo', error=str(e)[:200]))
+        await answer_with_text(message, 'error_processing_photo', error=str(e)[:200])
     finally:
         try:
             await processing_message.delete()

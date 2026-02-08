@@ -5,6 +5,7 @@
 import logging
 import httpx
 from config import Config
+from utils.premium_emoji import add_premium_emoji_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,13 @@ async def send_greeting(bot, chat_id: int, user_name: str = "") -> int | None:
         greeting_text = f"Привет, {user_name}! Чем могу помочь?"
     
     try:
+        # Применяем премиум эмодзи к приветствию
+        text_with_emoji, entities = add_premium_emoji_to_text(greeting_text, Config.PREMIUM_EMOJI_MAP)
         message = await bot.send_message(
             chat_id=chat_id,
-            text=greeting_text,
-            parse_mode="HTML"
+            text=text_with_emoji,
+            parse_mode="HTML",
+            entities=entities if entities else None
         )
         
         # Приветствие не сохраняем через ingest (это исходящее сообщение от бота)

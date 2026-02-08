@@ -10,7 +10,9 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from states import WithdrawStates
 from config import Config
-from utils.texts import get_text, get_casino_name
+from utils.texts import get_text, get_casino_name, get_text_with_premium_emoji
+from utils.premium_emoji import add_premium_emoji_to_text
+from utils.answer_helper import answer_with_text, answer_with_custom_text
 from utils.keyboards import get_casino_keyboard, get_cancel_keyboard
 from utils.settings import load_settings, get_settings
 from utils.qr_generator import get_casino_id_image_path
@@ -50,12 +52,14 @@ async def start_withdraw(message: Message, state: FSMContext):
     # Проверяем паузу
     if settings.get('pause', False):
         maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
-        await message.answer(f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}")
+        pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
+        text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
+        await message.answer(text_with_emoji, entities=entities if entities else None)
         return
     
     # Проверяем, включены ли выводы
     if not settings.get('withdrawals_enabled', True):
-        await message.answer(get_text('withdraw_disabled'))
+        await answer_with_text(message, 'withdraw_disabled')
         return
     
     # Начинаем диалог вывода
@@ -73,7 +77,9 @@ async def start_withdraw(message: Message, state: FSMContext):
             enabled_casinos.append((casino_key, casino_name))
     
     reply_markup = get_casino_keyboard(enabled_casinos)
-    await message.answer("💸 <b>Вывод средств</b>\n\nВыберите казино:", reply_markup=reply_markup)
+    withdraw_text = "💸 <b>Вывод средств</b>\n\nВыберите казино:"
+    text_with_emoji, entities = add_premium_emoji_to_text(withdraw_text, Config.PREMIUM_EMOJI_MAP)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=entities if entities else None)
 
 @router.message(WithdrawStates.bookmaker)
 async def process_withdraw_bookmaker(message: Message, state: FSMContext):
@@ -88,7 +94,7 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     # Определяем казино
@@ -103,7 +109,7 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
     
     bookmaker = bookmaker_map.get(message_text)
     if not bookmaker:
-        await message.answer(get_text('please_select_from_buttons'))
+        await answer_with_text(message, 'please_select_from_buttons')
         return
     
     # Проверяем настройки букмекера
@@ -117,7 +123,7 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
     
     if not bookmaker_withdraw_enabled:
         casino_name = get_casino_name(bookmaker)
-        await message.answer(f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.")
+        await answer_with_custom_text(message, f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.")
         return
     
     user_states[user_id]['data']['bookmaker'] = bookmaker
@@ -162,18 +168,18 @@ async def process_withdraw_phone(message: Message, state: FSMContext):
     message_text = message.text or ''
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     phone = message_text.strip()
     
     # Проверка формата телефона
     if not phone.startswith('+996'):
-        await message.answer(get_text('invalid_phone'))
+        await answer_with_text(message, 'invalid_phone')
         return
     
     if len(phone) < 13 or len(phone) > 16:
-        await message.answer(get_text('invalid_phone_length'))
+        await answer_with_text(message, 'invalid_phone_length')
         return
     
     # Сохраняем телефон
@@ -201,7 +207,12 @@ async def process_withdraw_phone(message: Message, state: FSMContext):
     casino_label = get_text('casino_label', casino_name=casino_name)
     phone_label = get_text('phone_label', phone=phone)
     send_qr = get_text('send_qr_code')
-    await message.answer(f"{withdraw_title}\n\n{casino_label}\n{phone_label}\n\n{send_qr}", reply_markup=reply_markup)
+    menu_text = f"{withdraw_title}\n\n{casino_label}\n{phone_label}\n\n{send_qr}"
+    text_with_emoji, entities = add_premium_emoji_to_text(menu_text, Config.PREMIUM_EMOJI_MAP)
+    all_entities = list(title_entities) if title_entities else []
+    if entities:
+        all_entities.extend(entities)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
 
 @router.message(WithdrawStates.qr_photo, F.photo | F.document)
 async def process_withdraw_qr(message: Message, state: FSMContext):
@@ -215,7 +226,7 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     # Получаем фото
@@ -226,7 +237,7 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
         photo_file_id = message.document.file_id
     
     if not photo_file_id:
-        await message.answer(get_text('please_send_qr'))
+        await answer_with_text(message, 'please_send_qr')
         return
     
     user_states[user_id]['data']['qr_photo_id'] = photo_file_id
@@ -295,11 +306,11 @@ async def process_withdraw_player_id(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     if not message_text.strip().isdigit():
-        await message.answer(get_text('invalid_player_id_format'))
+        await answer_with_text(message, 'invalid_player_id_format')
         return
     
     player_id = message_text.strip()
@@ -374,18 +385,19 @@ async def process_withdraw_code(message: Message, state: FSMContext):
         return
     
     if user_id not in user_states:
-        await message.answer("❌ Ошибка. Начните заново с /start")
+        await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
     if not message_text.strip():
-        await message.answer(get_text('invalid_code_empty'))
+        await answer_with_text(message, 'invalid_code_empty')
         return
     
     withdrawal_code = message_text.strip()
     user_states[user_id]['data']['code'] = withdrawal_code
     
     # Проверяем код и получаем сумму
-    checking_msg = await message.answer(get_text('checking_code'))
+    checking_text, checking_entities = get_text_with_premium_emoji('checking_code')
+    checking_msg = await message.answer(checking_text, entities=checking_entities if checking_entities else None)
     withdraw_amount = 0
     amount_check_ok = True
     
@@ -411,7 +423,7 @@ async def process_withdraw_code(message: Message, state: FSMContext):
             except Exception as json_error:
                 logger.error(f"Ошибка парсинга JSON ответа: {json_error}")
                 amount_check_ok = False
-                await message.answer("⚠️ Не удалось проверить сумму вывода. Попробуйте еще раз.")
+                await answer_with_custom_text(message, "⚠️ Не удалось проверить сумму вывода. Попробуйте еще раз.")
             
             if response.status_code == 200 and amount_check_ok:
                 if result.get('success'):
@@ -428,18 +440,18 @@ async def process_withdraw_code(message: Message, state: FSMContext):
                             withdraw_amount = float(amount_value)
                             if withdraw_amount <= 0:
                                 amount_check_ok = False
-                                await message.answer("⚠️ Сумма вывода не найдена. Проверьте код и попробуйте ещё раз.")
+                                await answer_with_custom_text(message, "⚠️ Сумма вывода не найдена. Проверьте код и попробуйте ещё раз.")
                             else:
                                 logger.info(f"✅ Сумма вывода успешно получена: {withdraw_amount} KGS. Отправляю заявку в админку...")
                         except (ValueError, TypeError) as e:
                             logger.error(f"Ошибка парсинга суммы: {e}, значение: {amount_value}")
                             amount_check_ok = False
-                            await message.answer("⚠️ Ошибка при обработке суммы вывода. Попробуйте ещё раз.")
+                            await answer_with_custom_text(message, "⚠️ Ошибка при обработке суммы вывода. Попробуйте ещё раз.")
                     else:
                         amount_check_ok = False
                         error_message = result.get('error') or result.get('message') or 'Не удалось получить сумму вывода'
                         logger.warning(f"⚠️ API withdraw-check вернул ошибку: {error_message}")
-                        await message.answer(f"⚠️ {error_message}")
+                        await answer_with_custom_text(message, f"⚠️ {error_message}")
                 else:
                     amount_check_ok = False
                     error_message = result.get('error') or result.get('message') or 'Не удалось проверить код вывода'
@@ -504,27 +516,27 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
                         logger.info(f"Ответ withdraw-execute (статус {execute_response.status_code}): {execute_result}")
                     except Exception as json_error:
                         logger.error(f"Ошибка парсинга JSON ответа withdraw-execute: {json_error}")
-                        await message.answer(get_text('withdraw_execute_failed'))
+                        await answer_with_text(message, 'withdraw_execute_failed')
                         from handlers.start import send_main_menu
                         await send_main_menu(message, message.from_user.first_name)
                         return
                     
                     if execute_response.status_code != 200:
                         error_msg = execute_result.get('error') or execute_result.get('message') or f"Ошибка выполнения вывода: {execute_response.status_code}"
-                        await message.answer(f"❌ {error_msg}")
+                        await answer_with_custom_text(message, f"❌ {error_msg}")
                         from handlers.start import send_main_menu
                         await send_main_menu(message, message.from_user.first_name)
                         return
                     
                     if not execute_result.get('success'):
                         error_msg = execute_result.get('message') or execute_result.get('error') or 'Ошибка выполнения вывода'
-                        await message.answer(f"❌ {error_msg}")
+                        await answer_with_custom_text(message, f"❌ {error_msg}")
                         from handlers.start import send_main_menu
                         await send_main_menu(message, message.from_user.first_name)
                         return
             except Exception as e:
                 logger.error(f"Ошибка выполнения вывода для 1xbet: {e}")
-                await message.answer("❌ Ошибка выполнения вывода. Попробуйте еще раз.")
+                await answer_with_custom_text(message, "❌ Ошибка выполнения вывода. Попробуйте еще раз.")
                 from handlers.start import send_main_menu
                 await send_main_menu(message, message.from_user.first_name)
                 return
@@ -563,7 +575,7 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
                 logger.info(f"✅ Ответ API payment (статус {payment_response.status_code}): success={result.get('success')}, request_id={result.get('data', {}).get('id')}")
             except Exception as json_error:
                 logger.error(f"Ошибка парсинга JSON ответа payment: {json_error}")
-                await message.answer(get_text('request_creation_error'))
+                await answer_with_text(message, 'request_creation_error')
                 from handlers.start import send_main_menu
                 await send_main_menu(message, message.from_user.first_name)
                 return
@@ -598,7 +610,7 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
                         except Exception as e:
                             logger.warning(f"Не удалось сохранить ID сообщения: {e}")
                 else:
-                    await message.answer(get_text('error_creating_withdraw'))
+                    await answer_with_text(message, 'error_creating_withdraw')
             else:
                 error_message = result.get('error') or result.get('message') or f'Ошибка создания заявки ({payment_response.status_code})'
                 await message.answer(f'❌ {error_message}')
@@ -611,9 +623,9 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
         logger.error(f"Ошибка создания заявки на вывод: {e}")
         error_msg = str(e).lower()
         if 'connection' in error_msg or 'connect' in error_msg or 'refused' in error_msg:
-            await message.answer('❌ Сервер недоступен. Пожалуйста, убедитесь, что админ-панель запущена.')
+            await answer_with_custom_text(message, '❌ Сервер недоступен. Пожалуйста, убедитесь, что админ-панель запущена.')
         else:
-            await message.answer('❌ Ошибка создания заявки. Попробуйте еще раз.')
+            await answer_with_custom_text(message, '❌ Ошибка создания заявки. Попробуйте еще раз.')
         
         from handlers.start import send_main_menu
         await send_main_menu(message, message.from_user.first_name)
