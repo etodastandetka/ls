@@ -422,14 +422,17 @@ async def process_amount(message: Message, state: FSMContext):
                     formatted_amount = f"{amount:.2f}"
                     player_id = str(user_states[user_id]['data']['player_id'])
                     
-                    # Используем HTML для отдельных цитат без пробела между ними
+                    # Формируем текст без HTML тегов (они будут удалены при применении премиум эмодзи)
                     caption_text = (
-                        f"<blockquote>💰 Сумма: {formatted_amount} сом</blockquote>"
-                        f"<blockquote>🆔 ID: {player_id}</blockquote>\n\n"
+                        f"💰 Сумма: {formatted_amount} сом\n"
+                        f"🆔 ID: {player_id}\n\n"
                         f"⏳ Время на оплату: {timer_text}\n"
                         f"‼️ Оплата строго до копеек\n"
                         f"📸 После оплаты отправьте фото чека"
                     )
+                    
+                    # Применяем премиум эмодзи
+                    caption_with_emoji, caption_entities = add_premium_emoji_to_text(caption_text, Config.PREMIUM_EMOJI_MAP)
                     
                     if qr_image:
                         # В aiogram 3 нужно использовать BufferedInputFile для BytesIO
@@ -439,13 +442,19 @@ async def process_amount(message: Message, state: FSMContext):
                         photo_file = BufferedInputFile(qr_bytes, filename="qr_code.png")
                         timer_message = await message.answer_photo(
                             photo=photo_file,
-                            caption=caption_text,
+                            caption=caption_with_emoji,
+                            caption_entities=caption_entities if caption_entities else None,
                             reply_markup=reply_markup,
-                            parse_mode=ParseMode.HTML
+                            parse_mode=None  # Отключаем parse_mode при использовании entities
                         )
                         user_states[user_id]['data']['is_photo_message'] = True
                     else:
-                        timer_message = await message.answer(caption_text, reply_markup=reply_markup)
+                        timer_message = await message.answer(
+                            caption_with_emoji, 
+                            reply_markup=reply_markup,
+                            entities=caption_entities if caption_entities else None,
+                            parse_mode=None
+                        )
                         user_states[user_id]['data']['is_photo_message'] = False
                     
                     # Сохраняем данные для таймера
