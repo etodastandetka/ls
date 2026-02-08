@@ -32,7 +32,7 @@ if env_file.exists():
     except Exception as e:
         logger.warning(f"Не удалось загрузить .env: {e}")
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN_HERE"  # Замените на токен вашего бота
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "8502647763:AAEaHMQpwzeFbUN4Hq1ZCq42CagkPFMgADo"
 
 # Файл для хранения эмодзи
 EMOJI_STORAGE_FILE = Path(__file__).parent / "premium_emojis.json"
