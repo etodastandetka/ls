@@ -212,6 +212,7 @@ async def cmd_start(message: Message, state: FSMContext):
         
         # Обработка реферальной ссылки
         param = None
+        referral_registered = False
         if message.text and len(message.text.split()) > 1:
             param = message.text.split()[1]
             logger.info(f"📋 Получен параметр: {param}")
@@ -222,8 +223,14 @@ async def cmd_start(message: Message, state: FSMContext):
                 if referral_code.startswith('_'):
                     referral_code = referral_code[1:]
                 
+                logger.info(f"🔍 Обработка реферального кода из параметра '{param}': извлечен код '{referral_code}'")
+                
                 if not referral_code or not referral_code.strip().isdigit():
-                    logger.warning(f"⚠️ Неверный формат реферального кода '{param}'")
+                    logger.warning(f"⚠️ Неверный формат реферального кода '{param}' (извлечен: '{referral_code}')")
+                    try:
+                        await message.answer("⚠️ Неверный формат реферальной ссылки.")
+                    except:
+                        pass
                 else:
                     logger.info(f"🔍 Обработка реферального кода: {referral_code} для пользователя {user_id}")
                     
@@ -231,19 +238,27 @@ async def cmd_start(message: Message, state: FSMContext):
                         referrer_id = int(referral_code)
                         if referrer_id == user_id:
                             logger.warning(f"⚠️ Пользователь {user_id} пытается пригласить самого себя")
+                            try:
+                                await message.answer("❌ Вы не можете использовать свою собственную реферальную ссылку.")
+                            except:
+                                pass
                         else:
-                            logger.info(f"🔄 Регистрация реферала: {referrer_id} -> {user_id}")
+                            logger.info(f"🔄 Регистрация реферала: {referrer_id} -> {user_id}, API_URL: {Config.API_URL}")
                             
                             max_retries = 3
                             retry_delay = 2
                             timeout = 15.0
                             success = False
+                            error_message = None
                             
                             for attempt in range(max_retries):
                                 try:
                                     async with httpx.AsyncClient(timeout=timeout) as client:
+                                        api_url = f"{Config.API_URL}/api/referral/register"
+                                        logger.info(f"📡 Отправка запроса на {api_url} (попытка {attempt + 1}/{max_retries})")
+                                        
                                         response = await client.post(
-                                            f"{Config.API_URL}/api/referral/register",
+                                            api_url,
                                             json={
                                                 "referrer_id": str(referrer_id),
                                                 "referred_id": str(user_id),
@@ -259,34 +274,62 @@ async def cmd_start(message: Message, state: FSMContext):
                                         if response.status_code == 200:
                                             try:
                                                 data = response.json()
+                                                logger.info(f"📡 Данные ответа: {data}")
                                                 if data.get('success'):
                                                     logger.info(f"✅ Реферальная связь зарегистрирована: {referrer_id} -> {user_id}")
-                                                    # Уведомления отправляются автоматически через API endpoint
-                                                    # Здесь просто отмечаем успех
+                                                    referral_registered = True
                                                     success = True
+                                                    # Уведомления отправляются автоматически через API endpoint
                                                     break
                                                 else:
                                                     error_msg = data.get('error', 'Unknown error')
-                                                    if 'already referred' in error_msg.lower() or 'cannot refer yourself' in error_msg.lower():
-                                                        logger.warning(f"⚠️ Не удалось зарегистрировать реферала: {error_msg}")
+                                                    error_message = error_msg
+                                                    logger.warning(f"⚠️ API вернул ошибку: {error_msg}")
+                                                    if 'already referred' in error_msg.lower():
+                                                        logger.info(f"ℹ️ Пользователь {user_id} уже является рефералом")
+                                                        break
+                                                    elif 'cannot refer yourself' in error_msg.lower():
+                                                        logger.warning(f"⚠️ Пользователь {user_id} пытается пригласить самого себя")
                                                         break
                                             except Exception as parse_error:
-                                                logger.warning(f"⚠️ Ошибка парсинга ответа (попытка {attempt + 1}): {parse_error}")
+                                                logger.error(f"❌ Ошибка парсинга ответа (попытка {attempt + 1}): {parse_error}")
+                                                error_message = f"Ошибка обработки ответа: {str(parse_error)}"
+                                        else:
+                                            try:
+                                                error_data = await response.json()
+                                                error_message = error_data.get('error', f'HTTP {response.status_code}')
+                                                logger.warning(f"⚠️ API вернул статус {response.status_code}: {error_message}")
+                                            except:
+                                                error_message = f'HTTP {response.status_code}'
+                                                logger.warning(f"⚠️ API вернул статус {response.status_code}")
                                         
                                         if attempt < max_retries - 1:
                                             logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
                                             await asyncio.sleep(retry_delay)
                                             
+                                except httpx.TimeoutException as e:
+                                    logger.error(f"⏱️ Таймаут при регистрации реферала (попытка {attempt + 1}/{max_retries}): {e}")
+                                    error_message = "Таймаут соединения"
+                                    if attempt < max_retries - 1:
+                                        logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
+                                        await asyncio.sleep(retry_delay)
                                 except Exception as e:
-                                    logger.error(f"❌ Ошибка при регистрации реферала (попытка {attempt + 1}/{max_retries}): {e}")
+                                    logger.error(f"❌ Ошибка при регистрации реферала (попытка {attempt + 1}/{max_retries}): {e}", exc_info=True)
+                                    error_message = f"Ошибка соединения: {str(e)}"
                                     if attempt < max_retries - 1:
                                         logger.info(f"⏳ Повторная попытка через {retry_delay} секунд...")
                                         await asyncio.sleep(retry_delay)
                             
                             if not success:
-                                logger.error(f"❌ Не удалось зарегистрировать реферала после {max_retries} попыток: {referrer_id} -> {user_id}")
+                                logger.error(f"❌ Не удалось зарегистрировать реферала после {max_retries} попыток: {referrer_id} -> {user_id}, ошибка: {error_message}")
+                                # Не отправляем сообщение об ошибке пользователю, чтобы не пугать его
+                                # Главное меню все равно отправится
                     except ValueError as e:
-                        logger.warning(f"⚠️ Неверный формат реферального кода '{referral_code}': {e}")
+                        logger.error(f"❌ Неверный формат реферального кода '{referral_code}': {e}")
+                        try:
+                            await message.answer("⚠️ Неверный формат реферальной ссылки.")
+                        except:
+                            pass
     
         # Очищаем состояние (FSM и user_states)
         try:
