@@ -291,12 +291,30 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
         try:
             from aiogram.types import FSInputFile
             photo = FSInputFile(casino_image_path)
-            await message.answer_photo(photo=photo, caption=message_text, reply_markup=reply_markup)
+            text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
+            all_entities = list(title_entities) if title_entities else []
+            if qr_entities:
+                all_entities.extend(qr_entities)
+            if entities:
+                all_entities.extend(entities)
+            await message.answer_photo(photo=photo, caption=text_with_emoji, reply_markup=reply_markup, caption_entities=all_entities if all_entities else None)
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отправить фото ID казино: {e}")
-            await message.answer(message_text, reply_markup=reply_markup)
+            text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
+            all_entities = list(title_entities) if title_entities else []
+            if qr_entities:
+                all_entities.extend(qr_entities)
+            if entities:
+                all_entities.extend(entities)
+            await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
     else:
-        await message.answer(message_text, reply_markup=reply_markup)
+        text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
+        all_entities = list(title_entities) if title_entities else []
+        if qr_entities:
+            all_entities.extend(qr_entities)
+        if entities:
+            all_entities.extend(entities)
+        await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
 
 @router.message(WithdrawStates.player_id)
 async def process_withdraw_player_id(message: Message, state: FSMContext):
@@ -354,12 +372,10 @@ async def process_withdraw_player_id(message: Message, state: FSMContext):
         address_text = "Lux on 24/7"
     
     casino_name = get_casino_name(user_states[user_id]['data'].get('bookmaker', ''))
-    withdraw_title = get_text('withdraw_title')
+    withdraw_title, title_entities = get_text_with_premium_emoji('withdraw_title')
     casino_label = get_text('casino_label', casino_name=casino_name)
     phone_label = get_text('phone_label', phone=user_states[user_id]['data'].get('phone', ''))
     account_id_label = f"🆔 ID игрока: {user_states[user_id]['data'].get('player_id', '')}"
-    
-    withdraw_title, title_entities = get_text_with_premium_emoji('withdraw_title')
     instruction_text = f"""{withdraw_title}
 
 {casino_label}
@@ -601,13 +617,13 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
                 request_id = result.get('data', {}).get('id')
                 if request_id:
                     casino_name = get_casino_name(data.get('bookmaker', ''))
-                    success_message = get_text(
+                    success_message, success_entities = get_text_with_premium_emoji(
                         'withdrawal_request_sent',
                         account_id=data.get('player_id', ''),
                         phone=data.get('phone', ''),
                         casino_name=casino_name
                     )
-                    await message.answer(success_message)
+                    await message.answer(success_message, entities=success_entities if success_entities else None)
                     
                     # Сохраняем ID сообщения в заявке
                     if message.message_id:
