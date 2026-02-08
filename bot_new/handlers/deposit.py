@@ -13,7 +13,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
 from states import DepositStates
 from config import Config
-from utils.texts import get_text, get_casino_name
+from utils.texts import get_text, get_casino_name, get_text_with_premium_emoji
+from utils.premium_emoji import add_premium_emoji_to_text
+from utils.answer_helper import answer_with_text, answer_with_custom_text
 from utils.keyboards import get_casino_keyboard, get_amount_keyboard, get_cancel_keyboard, get_bank_keyboard
 from utils.settings import load_settings, get_settings
 from utils.qr_generator import generate_qr_image, get_casino_id_image_path
