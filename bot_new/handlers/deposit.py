@@ -69,7 +69,6 @@ async def start_deposit(message: Message, state: FSMContext):
         # Проверяем, включены ли депозиты
         try:
             if not settings.get('deposits_enabled', True):
-                from utils.texts import get_text_with_premium_emoji
                 text, entities = get_text_with_premium_emoji('deposit_disabled')
                 await message.answer(text, entities=entities if entities else None)
                 return
