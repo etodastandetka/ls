@@ -73,7 +73,8 @@ async def support_handler(message: Message):
     await message.answer(
         text_with_emoji,
         reply_markup=keyboard,
-        entities=entities if entities else None
+        entities=entities if entities else None,
+        parse_mode=None
     )
 
 @router.message(F.text == "📊 История")
@@ -86,7 +87,8 @@ async def history_handler(message: Message):
     await message.answer(
         text_with_emoji,
         reply_markup=keyboard,
-        entities=entities if entities else None
+        entities=entities if entities else None,
+        parse_mode=None
     )
 
 @router.message(F.text.in_([get_text('faq'), "📖 Инструкция"]))
@@ -99,7 +101,8 @@ async def faq_handler(message: Message):
     await message.answer(
         text_with_emoji,
         reply_markup=keyboard,
-        entities=entities if entities else None
+        entities=entities if entities else None,
+        parse_mode=None
     )
 
 @router.message()
@@ -133,7 +136,8 @@ async def handle_other_messages(message: Message, state: FSMContext):
                 text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
                 await message.answer(
                     text_with_emoji,
-                    entities=entities if entities else None
+                    entities=entities if entities else None,
+                    parse_mode=None
                 )
                 return
         
