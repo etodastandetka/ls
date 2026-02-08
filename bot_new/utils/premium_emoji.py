@@ -23,79 +23,13 @@ def _utf16_offset(text: str, byte_pos: int) -> int:
     """Вычисляет offset в UTF-16 для позиции в строке"""
     return _utf16_len(text[:byte_pos])
 
-def _parse_html_tags(text: str) -> List[tuple]:
+def _remove_html_tags(text: str) -> str:
     """
-    Парсит HTML теги и возвращает список (offset, length, tag_type)
-    offset и length в UTF-16
-    """
-    entities = []
-    # Паттерн для HTML тегов: <tag>, </tag>, <tag attr="value">
-    pattern = r'<(/?)(\w+)(?:\s+[^>]*)?>'
-    
-    for match in re.finditer(pattern, text):
-        tag_start = match.start()
-        tag_end = match.end()
-        tag_name = match.group(2)
-        is_closing = match.group(1) == '/'
-        
-        # Определяем тип entity на основе тега
-        entity_type = None
-        if tag_name.lower() == 'b':
-            entity_type = MessageEntityType.BOLD
-        elif tag_name.lower() == 'i':
-            entity_type = MessageEntityType.ITALIC
-        elif tag_name.lower() == 'u':
-            entity_type = MessageEntityType.UNDERLINE
-        elif tag_name.lower() == 's':
-            entity_type = MessageEntityType.STRIKETHROUGH
-        elif tag_name.lower() == 'code':
-            entity_type = MessageEntityType.CODE
-        elif tag_name.lower() == 'pre':
-            entity_type = MessageEntityType.PRE
-        elif tag_name.lower() == 'a':
-            entity_type = MessageEntityType.TEXT_LINK
-        
-        if entity_type:
-            # Для открывающих тегов сохраняем позицию начала
-            # Для закрывающих тегов - позицию конца
-            if not is_closing:
-                entities.append((tag_start, tag_end, entity_type, 'open'))
-            else:
-                entities.append((tag_start, tag_end, entity_type, 'close'))
-    
-    return entities
-
-def _remove_html_tags(text: str) -> tuple[str, Dict[int, int]]:
-    """
-    Удаляет HTML теги из текста и возвращает mapping старых позиций к новым
-    Returns: (текст_без_тегов, {старая_позиция: новая_позиция})
+    Удаляет HTML теги из текста
+    Returns: текст без HTML тегов
     """
     pattern = r'<[^>]+>'
-    new_text = ''
-    position_map = {}  # Старая позиция -> новая позиция
-    
-    last_pos = 0
-    new_pos = 0
-    
-    for match in re.finditer(pattern, text):
-        # Добавляем текст до тега
-        before_tag = text[last_pos:match.start()]
-        new_text += before_tag
-        
-        # Обновляем mapping для символов до тега
-        for i in range(len(before_tag)):
-            position_map[last_pos + i] = new_pos + i
-        
-        new_pos += len(before_tag)
-        last_pos = match.end()
-    
-    # Добавляем оставшийся текст
-    remaining = text[last_pos:]
-    new_text += remaining
-    for i in range(len(remaining)):
-        position_map[last_pos + i] = new_pos + i
-    
-    return new_text, position_map
+    return re.sub(pattern, '', text)
 
 
 def create_premium_emoji_entity(
@@ -128,7 +62,7 @@ def add_premium_emoji_to_text(
 ) -> tuple[str, List[MessageEntity]]:
     """
     Добавляет премиум эмодзи в текст, заменяя обычные эмодзи
-    Поддерживает HTML теги - удаляет их и создает entities для форматирования
+    Удаляет HTML теги перед обработкой
     
     Args:
         text: Исходный текст с обычными эмодзи (может содержать HTML теги)
@@ -136,7 +70,7 @@ def add_premium_emoji_to_text(
     
     Returns:
         Кортеж (текст_без_HTML_с_эмодзи, список_entities)
-        entities включают как премиум эмодзи, так и форматирование из HTML
+        entities включают только премиум эмодзи
     
     Example:
         text, entities = add_premium_emoji_to_text(
@@ -144,8 +78,8 @@ def add_premium_emoji_to_text(
             {"😊": "1234567890123456789", "🎉": "9876543210987654321"}
         )
     """
-    # Удаляем HTML теги и получаем mapping позиций
-    text_without_html, position_map = _remove_html_tags(text)
+    # Удаляем HTML теги
+    text_without_html = _remove_html_tags(text)
     
     entities = []
     new_text = text_without_html
@@ -170,39 +104,6 @@ def add_premium_emoji_to_text(
             )
             entities.append(entity)
             offset = pos + len(emoji_char)
-    
-    # Парсим HTML теги и создаем entities для форматирования
-    html_entities = _parse_html_tags(text)
-    # Создаем пары открывающих и закрывающих тегов
-    tag_stack = {}  # {tag_type: [(open_pos, open_end), ...]}
-    
-    for tag_start, tag_end, tag_type, tag_kind in html_entities:
-        if tag_kind == 'open':
-            if tag_type not in tag_stack:
-                tag_stack[tag_type] = []
-            # Находим позицию в тексте без HTML
-            # Ищем позицию начала тега в исходном тексте
-            # И переводим в позицию в тексте без HTML через position_map
-            mapped_start = position_map.get(tag_start, tag_start)
-            tag_stack[tag_type].append((mapped_start, tag_end))
-        elif tag_kind == 'close':
-            if tag_type in tag_stack and tag_stack[tag_type]:
-                open_start, open_end = tag_stack[tag_type].pop()
-                mapped_end = position_map.get(tag_start, tag_start)
-                # Создаем entity для форматирования
-                # offset - позиция после открывающего тега
-                # length - до закрывающего тега
-                text_after_open = text_without_html[open_end:]
-                text_before_close = text_after_open[:mapped_end - open_end]
-                if text_before_close:
-                    utf16_offset_start = _utf16_offset(text_without_html, open_end)
-                    utf16_length = _utf16_len(text_before_close)
-                    entity = MessageEntity(
-                        type=tag_type,
-                        offset=utf16_offset_start,
-                        length=utf16_length
-                    )
-                    entities.append(entity)
     
     return new_text, entities
 
