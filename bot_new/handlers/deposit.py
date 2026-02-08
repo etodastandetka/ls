@@ -122,10 +122,21 @@ async def start_deposit(message: Message, state: FSMContext):
             deposit_title, title_entities = get_text_with_premium_emoji('deposit_title')
             select_casino = get_text('select_casino')
             menu_text = f"{deposit_title}\n\n{select_casino}"
+            # Применяем премиум эмодзи ко всему тексту (включая select_casino)
             text_with_emoji, entities = add_premium_emoji_to_text(menu_text, Config.PREMIUM_EMOJI_MAP)
+            # Объединяем entities: сначала из deposit_title, затем из общего текста
             all_entities = list(title_entities) if title_entities else []
+            # Добавляем entities из общего текста, исключая те, что уже есть в title_entities
             if entities:
-                all_entities.extend(entities)
+                for entity in entities:
+                    # Проверяем, не пересекается ли entity с title_entities
+                    overlaps = False
+                    if title_entities:
+                        title_end = max(e.offset + e.length for e in title_entities) if title_entities else 0
+                        if entity.offset < title_end:
+                            overlaps = True
+                    if not overlaps:
+                        all_entities.append(entity)
             await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
         except Exception as e:
             logger.error(f"❌ Ошибка при начале депозита для пользователя {user_id}: {e}", exc_info=True)

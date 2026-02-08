@@ -160,10 +160,19 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
     casino_label = get_text('casino_label', casino_name=casino_name)
     enter_phone = get_text('enter_phone')
     menu_text = f"{withdraw_title}\n\n{casino_label}\n\n{enter_phone}"
+    # Применяем премиум эмодзи ко всему тексту
     text_with_emoji, entities = add_premium_emoji_to_text(menu_text, Config.PREMIUM_EMOJI_MAP)
+    # Объединяем entities, исключая пересечения
     all_entities = list(title_entities) if title_entities else []
     if entities:
-        all_entities.extend(entities)
+        for entity in entities:
+            overlaps = False
+            if title_entities:
+                title_end = max(e.offset + e.length for e in title_entities) if title_entities else 0
+                if entity.offset < title_end:
+                    overlaps = True
+            if not overlaps:
+                all_entities.append(entity)
     await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
 
 @router.message(WithdrawStates.phone)
