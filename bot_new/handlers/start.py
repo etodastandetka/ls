@@ -9,7 +9,7 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from config import Config
-from utils.texts import get_text
+from utils.texts import get_text, get_text_with_premium_emoji
 from utils.keyboards import get_main_menu_keyboard, get_main_menu_inline_keyboard
 from utils.settings import load_settings, get_settings
 from utils.state_manager import clear_pending_deposit_state
