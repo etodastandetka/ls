@@ -9,7 +9,8 @@ import logging
 import os
 from pathlib import Path
 from aiogram import Bot, Dispatcher, Router, F
-from aiogram.types import Message, MessageEntity, MessageEntityType, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, MessageEntity, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.enums import MessageEntityType
 from aiogram.filters import Command
 
 # Настройка логирования

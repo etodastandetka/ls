@@ -9,7 +9,8 @@
 """
 
 from typing import Optional, List, Dict
-from aiogram.types import MessageEntity, MessageEntityType
+from aiogram.types import MessageEntity
+from aiogram.enums import MessageEntityType
 from aiogram import Bot
 
 
