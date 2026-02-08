@@ -230,7 +230,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
         )
     
     casino_name = get_casino_name(bookmaker)
-    deposit_title = get_text('deposit_title')
+    deposit_title, title_entities = get_text_with_premium_emoji('deposit_title')
     casino_label = get_text('casino_label', casino_name=casino_name)
     enter_player_id = get_text('enter_player_id')
     
@@ -620,7 +620,13 @@ async def process_receipt_photo(message: Message, state: FSMContext):
                         account_id=data.get('player_id', ''),
                         casino_name=casino_name
                     )
-                    await message.answer(success_message, reply_markup=None)
+                    success_text, success_entities = add_premium_emoji_to_text(success_message, Config.PREMIUM_EMOJI_MAP)
+                    await message.answer(
+                        success_text, 
+                        reply_markup=None,
+                        entities=success_entities if success_entities else None,
+                        parse_mode=None
+                    )
                     
                     # Удаляем сообщение с QR-кодом если оно есть
                     if user_id in user_states:
