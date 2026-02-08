@@ -146,13 +146,37 @@ def get_text(key: str, lang: str = 'ru', **kwargs) -> str:
         casino_key = kwargs.get('bookmaker') or kwargs.get('casino') or ''
         kwargs['casino_name'] = get_casino_name(casino_key)
     
+    # Удаляем {logo_emoji} из kwargs, чтобы не было ошибки при форматировании
+    # Логотип будет обработан отдельно в get_text_with_premium_emoji
+    logo_emoji_placeholder = '{logo_emoji}' in text
+    if logo_emoji_placeholder:
+        # Временно заменяем на пустую строку для форматирования
+        text = text.replace('{logo_emoji}', '')
+    
     # Подставляем переменные
     try:
-        return text.format(**kwargs)
+        formatted_text = text.format(**kwargs)
+        # Возвращаем плейсхолдер обратно, если он был
+        if logo_emoji_placeholder:
+            formatted_text = formatted_text.replace('', '{logo_emoji}', 1) if '{logo_emoji}' not in formatted_text else formatted_text
+            # Более надежный способ - вставляем в конец строки перед первым переносом
+            if '{logo_emoji}' not in formatted_text:
+                # Находим позицию после "LUX ON!"
+                luxon_pos = formatted_text.find('LUX ON!')
+                if luxon_pos != -1:
+                    insert_pos = luxon_pos + len('LUX ON!')
+                    formatted_text = formatted_text[:insert_pos] + ' {logo_emoji}' + formatted_text[insert_pos:]
+        return formatted_text
     except KeyError as e:
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(f"⚠️ Отсутствует переменная {e} в тексте '{key}'")
+        # Возвращаем плейсхолдер обратно, если он был
+        if logo_emoji_placeholder and '{logo_emoji}' not in text:
+            luxon_pos = text.find('LUX ON!')
+            if luxon_pos != -1:
+                insert_pos = luxon_pos + len('LUX ON!')
+                text = text[:insert_pos] + ' {logo_emoji}' + text[insert_pos:]
         return text
 
 
