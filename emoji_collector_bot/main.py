@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.types import Message, MessageEntity, MessageEntityType, InlineKeyboardMarkup, InlineKeyboardButton
@@ -19,7 +20,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Токен бота (установите в .env или здесь)
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # Замените на токен вашего бота
+# Пробуем загрузить из .env файла
+env_file = Path(__file__).parent / ".env"
+if env_file.exists():
+    try:
+        for line in env_file.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ[key.strip()] = value.strip().strip('"').strip("'")
+    except Exception as e:
+        logger.warning(f"Не удалось загрузить .env: {e}")
+
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN_HERE"  # Замените на токен вашего бота
 
 # Файл для хранения эмодзи
 EMOJI_STORAGE_FILE = Path(__file__).parent / "premium_emojis.json"
