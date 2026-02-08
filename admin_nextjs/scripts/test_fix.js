@@ -93,3 +93,4 @@ console.log('URL: https://bakai24.app/#' + qrHash)
 
 
 
+

@@ -35,9 +35,15 @@ class Config:
     # Токен бота из переменной окружения или .env файла (admin_nextjs/.env)
     BOT_TOKEN = os.getenv("OPER_TOKEN") or os.getenv("MODERATOR_BOT_TOKEN") or os.getenv("BOT_TOKEN")
     
-    # Список запрещенных слов (регистр не важен)
-    # Слова будут искаться как отдельные слова (не как часть других слов)
-    FORBIDDEN_WORDS = [
+    # ID администратора, который может управлять словами
+    ADMIN_ID = 8203434235
+    
+    # Время мута в секундах (5 минут)
+    MUTE_DURATION_SECONDS = 300  # 5 минут
+    
+    # Список запрещенных слов загружается из файла или используется дефолтный
+    # Дефолтный список (будет заменен словами из файла при загрузке)
+    _DEFAULT_WORDS = [
         "чотал",
         "шотал",
         "четр",
@@ -53,6 +59,18 @@ class Config:
         "@luxon_boss",
         "@luxservice",
     ]
+    
+    # Загружаем слова из файла или используем дефолтные
+    try:
+        from words_manager import load_words
+        _loaded_words = load_words()
+        FORBIDDEN_WORDS = _loaded_words if _loaded_words else _DEFAULT_WORDS
+        # Если файл пустой, сохраняем дефолтные слова
+        if not _loaded_words:
+            from words_manager import save_words
+            save_words(_DEFAULT_WORDS)
+    except Exception:
+        FORBIDDEN_WORDS = _DEFAULT_WORDS
     
     # Пропускать сообщения от администраторов группы
     SKIP_ADMINS = True

@@ -58,3 +58,4 @@ python main.py
 - `premium_emojis.json` - Файл с сохраненными эмодзи (создается автоматически)
 - `requirements.txt` - Зависимости
 
+
