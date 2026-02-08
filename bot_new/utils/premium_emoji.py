@@ -38,6 +38,14 @@ def create_premium_emoji_entity(
     )
 
 
+def _utf16_len(text: str) -> int:
+    """Вычисляет длину строки в UTF-16 (для Telegram API)"""
+    return len(text.encode('utf-16-le')) // 2
+
+def _utf16_offset(text: str, byte_pos: int) -> int:
+    """Вычисляет offset в UTF-16 для позиции в строке"""
+    return _utf16_len(text[:byte_pos])
+
 def add_premium_emoji_to_text(
     text: str,
     emoji_map: Dict[str, str]
@@ -69,11 +77,15 @@ def add_premium_emoji_to_text(
             if pos == -1:
                 break
             
+            # Вычисляем offset и length в UTF-16 (требуется для Telegram API)
+            utf16_offset = _utf16_offset(new_text, pos)
+            utf16_length = _utf16_len(emoji_char)
+            
             # Создаем entity для премиум эмодзи
             entity = create_premium_emoji_entity(
                 custom_emoji_id=emoji_id,
-                offset=pos,
-                length=len(emoji_char)
+                offset=utf16_offset,
+                length=utf16_length
             )
             entities.append(entity)
             offset = pos + len(emoji_char)

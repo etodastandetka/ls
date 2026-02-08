@@ -47,10 +47,10 @@ async def send_greeting(bot, chat_id: int, user_name: str = "") -> int | None:
     try:
         # Применяем премиум эмодзи к приветствию
         text_with_emoji, entities = add_premium_emoji_to_text(greeting_text, Config.PREMIUM_EMOJI_MAP)
+        # Когда используем entities, не используем parse_mode (entities работают без parse_mode)
         message = await bot.send_message(
             chat_id=chat_id,
             text=text_with_emoji,
-            parse_mode="HTML",
             entities=entities if entities else None
         )
         
