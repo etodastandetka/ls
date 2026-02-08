@@ -27,7 +27,7 @@ TRANSLATIONS = {
     'ru': {
         'welcome': "Привет, {user_name}!\n\nПополнение | Вывод\nиз букмекерских контор!\n\n📥 Пополнение — 0%\n📤 Вывод — 0%\n🕒 Работаем 24/7\n\n👨‍💻 Поддержка: @operator_luxon_bot\n💬 Чат для всех: @luxon_chat\n\n🔒 Финансовый контроль обеспечен личным отделом безопасности",
         'select_action': "Выберите действие:",
-        'main_menu_text': "Привет, {user_name} | LUX ON!\n\nПополнение | Вывод\nиз букмекерских контор!\n\n📥 Пополнение — 0%\n📤 Вывод — 0%\n🕒 Работаем 24/7\n\n👨‍💻 Поддержка: @operator_luxon_bot\n💬 Чат для всех: @luxon_chat\n\n🔒 Финансовый контроль обеспечен личным отделом безопасности",
+        'main_menu_text': "Привет, {user_name} | LUX ON! {logo_emoji}\n\nПополнение | Вывод\nиз букмекерских контор!\n\n📥 Пополнение — 0%\n📤 Вывод — 0%\n🕒 Работаем 24/7\n\n👨‍💻 Поддержка: @operator_luxon_bot\n💬 Чат для всех: @luxon_chat\n\n🔒 Финансовый контроль обеспечен личным отделом безопасности",
         # Премиум эмодзи можно добавить через custom_emoji_id
         # Пример: используйте функцию replace_emoji_in_text из utils.premium_emoji
         'main_menu_webapp_button': "LUX ON",
@@ -162,11 +162,51 @@ def get_text_with_premium_emoji(key: str, lang: str = 'ru', **kwargs) -> tuple[s
     Returns:
         tuple: (текст, список entities для премиум эмодзи)
     """
-    from utils.premium_emoji import add_premium_emoji_to_text
+    from utils.premium_emoji import add_premium_emoji_to_text, _utf16_offset
     from config import Config
+    from aiogram.types import MessageEntity
+    from aiogram.enums import MessageEntityType
     
     text = get_text(key, lang, **kwargs)
-    text_with_emoji, entities = add_premium_emoji_to_text(text, Config.PREMIUM_EMOJI_MAP)
-    return text_with_emoji, entities
+    
+    # Специальная обработка для main_menu_text - добавляем логотип
+    if key == 'main_menu_text' and '{logo_emoji}' in text:
+        # Заменяем плейсхолдер на специальный символ-маркер для логотипа
+        logo_marker = "🔷"  # Временный маркер, который заменим на премиум эмодзи
+        text_with_marker = text.replace('{logo_emoji}', logo_marker)
+        text_with_emoji, entities = add_premium_emoji_to_text(text_with_marker, Config.PREMIUM_EMOJI_MAP)
+        
+        # Находим позицию маркера в тексте
+        logo_pos = text_with_emoji.find(logo_marker)
+        if logo_pos != -1:
+            # Вычисляем UTF-16 offset для логотипа
+            logo_utf16_offset = _utf16_offset(text_with_emoji, logo_pos)
+            
+            # Удаляем маркер из текста
+            text = text_with_emoji.replace(logo_marker, "")
+            
+            # Создаем entity для логотипа
+            logo_entity = MessageEntity(
+                type=MessageEntityType.CUSTOM_EMOJI,
+                offset=logo_utf16_offset,
+                length=1,
+                custom_emoji_id="5188543703018408791"
+            )
+            
+            # Обновляем offset для всех entities после логотипа (маркер занимает 1 символ в UTF-16)
+            updated_entities = []
+            for entity in entities:
+                if entity.offset > logo_utf16_offset:
+                    entity.offset -= 1
+                updated_entities.append(entity)
+            updated_entities.append(logo_entity)
+            entities = updated_entities
+        else:
+            # Если маркер не найден, просто применяем премиум эмодзи
+            text = text_with_emoji
+    else:
+        text, entities = add_premium_emoji_to_text(text, Config.PREMIUM_EMOJI_MAP)
+    
+    return text, entities
 
 
