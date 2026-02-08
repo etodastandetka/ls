@@ -153,8 +153,11 @@ async def send_config(message: Message):
     config_file = BytesIO(config_bytes)
     config_file.name = "premium_emoji_config.py"
     
+    # Создаем InputFile из BytesIO
+    input_file = InputFile(config_file, filename="premium_emoji_config.py")
+    
     await message.answer_document(
-        document=config_file,
+        document=input_file,
         caption=f"📋 <b>Конфиг файл</b>\n\nСохранено эмодзи: {len(saved_emojis)}\n\nСкопируйте содержимое в <code>bot_new/config.py</code> в <code>PREMIUM_EMOJI_MAP</code>",
         parse_mode="HTML"
     )
