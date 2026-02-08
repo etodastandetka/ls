@@ -213,9 +213,29 @@ async def cmd_start(message: Message, state: FSMContext):
         # Обработка реферальной ссылки
         param = None
         referral_registered = False
-        if message.text and len(message.text.split()) > 1:
-            param = message.text.split()[1]
-            logger.info(f"📋 Получен параметр: {param}")
+        
+        # Логируем полное сообщение для отладки
+        logger.info(f"🔍 [START] Полное сообщение: text='{message.text}', entities={message.entities}")
+        
+        # Пробуем получить параметр из текста сообщения
+        if message.text:
+            parts = message.text.split()
+            logger.info(f"🔍 [START] Части сообщения: {parts}, количество: {len(parts)}")
+            if len(parts) > 1:
+                param = parts[1]
+                logger.info(f"📋 Получен параметр из текста: '{param}'")
+        
+        # Если параметр не найден в тексте, пробуем получить из entities (для deep links)
+        if not param and message.entities:
+            for entity in message.entities:
+                if entity.type == "bot_command" and entity.offset == 0:
+                    # Параметр может быть после команды
+                    if len(message.text) > entity.length:
+                        potential_param = message.text[entity.length:].strip()
+                        if potential_param:
+                            param = potential_param
+                            logger.info(f"📋 Получен параметр из entities: '{param}'")
+                            break
         
         if param:
             if param.startswith('ref'):
