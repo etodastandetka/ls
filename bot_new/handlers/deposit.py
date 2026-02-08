@@ -60,7 +60,7 @@ async def start_deposit(message: Message, state: FSMContext):
                 maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
                 pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
                 text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
-                await message.answer(text_with_emoji, entities=entities if entities else None)
+                await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                 return
         except Exception as pause_error:
             logger.error(f"❌ Ошибка при проверке паузы: {pause_error}")
@@ -69,7 +69,7 @@ async def start_deposit(message: Message, state: FSMContext):
         try:
             if not settings.get('deposits_enabled', True):
                 text, entities = get_text_with_premium_emoji('deposit_disabled')
-                await message.answer(text, entities=entities if entities else None)
+                await message.answer(text, entities=entities if entities else None, parse_mode=None)
                 return
         except Exception as deposit_check_error:
             logger.error(f"❌ Ошибка при проверке депозитов: {deposit_check_error}")
@@ -93,7 +93,7 @@ async def start_deposit(message: Message, state: FSMContext):
                             # У пользователя есть активная заявка на пополнение
                             warning_text = "⚠️ У вас есть ожидающая заявка на пополнение. Дождитесь обработки текущей заявки перед созданием новой."
                             text_with_emoji, entities = add_premium_emoji_to_text(warning_text, Config.PREMIUM_EMOJI_MAP)
-                            await message.answer(text_with_emoji, entities=entities if entities else None)
+                            await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                             return
         except Exception as check_error:
             logger.warning(f"⚠️ Не удалось проверить активные заявки: {check_error}")
@@ -134,7 +134,7 @@ async def start_deposit(message: Message, state: FSMContext):
                             overlaps = True
                     if not overlaps:
                         all_entities.append(entity)
-            await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
+            await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None, parse_mode=None)
         except Exception as e:
             logger.error(f"❌ Ошибка при начале депозита для пользователя {user_id}: {e}", exc_info=True)
             try:
@@ -368,7 +368,7 @@ async def process_amount(message: Message, state: FSMContext):
     all_entities = list(qr_entities) if qr_entities else []
     if entities:
         all_entities.extend(entities)
-    generating_message = await message.answer(text_with_emoji, reply_markup=ReplyKeyboardRemove(), entities=all_entities if all_entities else None)
+    generating_message = await message.answer(text_with_emoji, reply_markup=ReplyKeyboardRemove(), entities=all_entities if all_entities else None, parse_mode=None)
     
     # Получаем QR ссылки
     try:
@@ -552,7 +552,7 @@ async def process_receipt_photo(message: Message, state: FSMContext):
     # Получаем фото в base64
     processing_text = "⏳ Обрабатываю фото чека и создаю заявку..."
     text_with_emoji, entities = add_premium_emoji_to_text(processing_text, Config.PREMIUM_EMOJI_MAP)
-    processing_message = await message.answer(text_with_emoji, entities=entities if entities else None)
+    processing_message = await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
     try:
         from bot import bot
         from io import BytesIO

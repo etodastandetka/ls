@@ -13,7 +13,7 @@ async def answer_with_text(message: Message, text_key: str, **kwargs) -> Message
     text, entities = get_text_with_premium_emoji(text_key, **kwargs)
     # Отключаем parse_mode при использовании entities
     kwargs.pop('parse_mode', None)
-    return await message.answer(text, entities=entities if entities else None, **kwargs)
+    return await message.answer(text, entities=entities if entities else None, parse_mode=None, **kwargs)
 
 
 async def answer_with_custom_text(message: Message, text: str, **kwargs) -> Message:
@@ -21,5 +21,5 @@ async def answer_with_custom_text(message: Message, text: str, **kwargs) -> Mess
     text_with_emoji, entities = add_premium_emoji_to_text(text, Config.PREMIUM_EMOJI_MAP)
     # Отключаем parse_mode при использовании entities
     kwargs.pop('parse_mode', None)
-    return await message.answer(text_with_emoji, entities=entities if entities else None, **kwargs)
+    return await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None, **kwargs)
 

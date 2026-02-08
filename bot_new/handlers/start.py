@@ -63,7 +63,7 @@ async def send_channel_subscription_message(message: Message, channel_username: 
     text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
     
     try:
-        await message.answer(text_with_emoji, reply_markup=keyboard, entities=entities if entities else None)
+        await message.answer(text_with_emoji, reply_markup=keyboard, entities=entities if entities else None, parse_mode=None)
         logger.info(f"✅ Сообщение о подписке отправлено пользователю {message.from_user.id}")
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке сообщения о подписке: {e}")
@@ -190,7 +190,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
                 pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
                 text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
-                await message.answer(text_with_emoji, entities=entities if entities else None)
+                await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                 logger.info(f"⏸️ Бот на паузе, пользователь {user_id} получил сообщение о технических работах")
                 return
         except Exception as pause_error:
@@ -275,7 +275,7 @@ async def cmd_start(message: Message, state: FSMContext):
                         from utils.premium_emoji import add_premium_emoji_to_text
                         error_text = "⚠️ Неверный формат реферальной ссылки."
                         text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
-                        await message.answer(text_with_emoji, entities=entities if entities else None)
+                        await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                     except:
                         pass
                 else:
@@ -289,7 +289,7 @@ async def cmd_start(message: Message, state: FSMContext):
                                 from utils.premium_emoji import add_premium_emoji_to_text
                                 error_text = "❌ Вы не можете использовать свою собственную реферальную ссылку."
                                 text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
-                                await message.answer(text_with_emoji, entities=entities if entities else None)
+                                await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                             except:
                                 pass
                         else:
@@ -380,7 +380,7 @@ async def cmd_start(message: Message, state: FSMContext):
                             from utils.premium_emoji import add_premium_emoji_to_text
                             error_text = "⚠️ Неверный формат реферальной ссылки."
                             text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
-                            await message.answer(text_with_emoji, entities=entities if entities else None)
+                            await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                         except:
                             pass
     

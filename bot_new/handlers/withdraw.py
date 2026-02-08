@@ -54,7 +54,7 @@ async def start_withdraw(message: Message, state: FSMContext):
         maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
         pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
         text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
-        await message.answer(text_with_emoji, entities=entities if entities else None)
+        await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
         return
     
     # Проверяем, включены ли выводы
@@ -79,7 +79,7 @@ async def start_withdraw(message: Message, state: FSMContext):
     reply_markup = get_casino_keyboard(enabled_casinos)
     withdraw_text = "💸 <b>Вывод средств</b>\n\nВыберите казино:"
     text_with_emoji, entities = add_premium_emoji_to_text(withdraw_text, Config.PREMIUM_EMOJI_MAP)
-    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=entities if entities else None)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=entities if entities else None, parse_mode=None)
 
 @router.message(WithdrawStates.bookmaker)
 async def process_withdraw_bookmaker(message: Message, state: FSMContext):
@@ -173,7 +173,7 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
                     overlaps = True
             if not overlaps:
                 all_entities.append(entity)
-    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None, parse_mode=None)
 
 @router.message(WithdrawStates.phone)
 async def process_withdraw_phone(message: Message, state: FSMContext):
@@ -233,7 +233,7 @@ async def process_withdraw_phone(message: Message, state: FSMContext):
                     overlaps = True
             if not overlaps:
                 all_entities.append(entity)
-    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None, parse_mode=None)
 
 @router.message(WithdrawStates.qr_photo, F.photo | F.document)
 async def process_withdraw_qr(message: Message, state: FSMContext):
@@ -322,7 +322,7 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
                 all_entities.extend(qr_entities)
             if entities:
                 all_entities.extend(entities)
-            await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
+            await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None, parse_mode=None)
     else:
         text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
         all_entities = list(title_entities) if title_entities else []
@@ -330,7 +330,7 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
             all_entities.extend(qr_entities)
         if entities:
             all_entities.extend(entities)
-        await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
+        await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None, parse_mode=None)
 
 @router.message(WithdrawStates.player_id)
 async def process_withdraw_player_id(message: Message, state: FSMContext):
@@ -412,7 +412,7 @@ async def process_withdraw_player_id(message: Message, state: FSMContext):
     all_entities = list(title_entities) if title_entities else []
     if entities:
         all_entities.extend(entities)
-    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None, parse_mode=None)
 
 @router.message(WithdrawStates.code)
 async def process_withdraw_code(message: Message, state: FSMContext):
@@ -439,7 +439,7 @@ async def process_withdraw_code(message: Message, state: FSMContext):
     
     # Проверяем код и получаем сумму
     checking_text, checking_entities = get_text_with_premium_emoji('checking_code')
-    checking_msg = await message.answer(checking_text, entities=checking_entities if checking_entities else None)
+    checking_msg = await message.answer(checking_text, entities=checking_entities if checking_entities else None, parse_mode=None)
     withdraw_amount = 0
     amount_check_ok = True
     
@@ -639,7 +639,7 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
                         phone=data.get('phone', ''),
                         casino_name=casino_name
                     )
-                    await message.answer(success_message, entities=success_entities if success_entities else None)
+                    await message.answer(success_message, entities=success_entities if success_entities else None, parse_mode=None)
                     
                     # Сохраняем ID сообщения в заявке
                     if message.message_id:

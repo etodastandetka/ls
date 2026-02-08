@@ -146,7 +146,7 @@ async def handle_other_messages(message: Message, state: FSMContext):
                     from utils.premium_emoji import add_premium_emoji_to_text
                     warning_text = "⚠️ Сообщение содержит недопустимые символы. Пожалуйста, отправьте корректное сообщение."
                     text_with_emoji, entities = add_premium_emoji_to_text(warning_text, Config.PREMIUM_EMOJI_MAP)
-                    await message.answer(text_with_emoji, entities=entities if entities else None)
+                    await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                 except:
                     pass
                 return

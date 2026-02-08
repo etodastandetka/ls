@@ -54,7 +54,7 @@ async def referral_command(message: Message):
                         message_text += "\nПока нет данных"
                     
                     text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
-                    await message.answer(text_with_emoji, entities=entities if entities else None)
+                    await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
                 else:
                     await answer_with_custom_text(message, "❌ Ошибка при получении данных реферальной программы")
             else:

@@ -150,5 +150,6 @@ async def send_message_with_premium_emoji(
         chat_id=chat_id,
         text=new_text,
         entities=entities if entities else None,
+        parse_mode=None,  # Явно отключаем parse_mode
         **kwargs
     )
