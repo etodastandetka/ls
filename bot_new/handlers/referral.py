@@ -58,7 +58,7 @@ async def referral_command(message: Message):
                 else:
                     await answer_with_custom_text(message, "❌ Ошибка при получении данных реферальной программы")
             else:
-                await message.answer("❌ Ошибка при получении данных реферальной программы")
+                await answer_with_custom_text(message, "❌ Ошибка при получении данных реферальной программы")
                 
     except Exception as e:
         logger.error(f"Ошибка при получении реферальной статистики: {e}")

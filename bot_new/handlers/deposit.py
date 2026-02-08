@@ -144,7 +144,7 @@ async def start_deposit(message: Message, state: FSMContext):
     except Exception as main_error:
         logger.error(f"❌ Критическая ошибка в start_deposit: {main_error}", exc_info=True)
         try:
-            await message.answer("❌ Произошла ошибка. Попробуйте еще раз или напишите /start")
+            await answer_with_custom_text(message, "❌ Произошла ошибка. Попробуйте еще раз или напишите /start")
         except:
             pass
 
@@ -541,7 +541,7 @@ async def process_receipt_photo(message: Message, state: FSMContext):
                 await answer_with_custom_text(message, "❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново.")
                 return
         else:
-            await message.answer("❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново.")
+            await answer_with_custom_text(message, "❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново.")
             return
     
     # Получаем фото

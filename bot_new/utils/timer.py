@@ -10,6 +10,8 @@ from aiogram.enums import ParseMode
 from utils.keyboards import get_bank_keyboard
 from utils.settings import load_settings, get_settings
 from utils.texts import get_casino_name, get_text
+from utils.premium_emoji import add_premium_emoji_to_text
+from config import Config
 from html import escape
 
 logger = logging.getLogger(__name__)
@@ -102,34 +104,39 @@ async def update_timer(bot: Bot, user_id: int, total_seconds: int, data: dict, m
                     
                     casino_name = get_casino_name(current_data.get('bookmaker', ''))
                     
-                    # Используем HTML для отдельных цитат без пробела между ними
+                    # Формируем текст без HTML тегов (они будут удалены при применении премиум эмодзи)
                     amount_str = f"{current_data.get('amount', 0):.2f}"
                     player_id_str = str(current_data.get('player_id', ''))
                     
                     updated_text = (
-                        f"<blockquote>💰 Сумма: {amount_str} сом</blockquote>"
-                        f"<blockquote>🆔 ID: {player_id_str}</blockquote>\n\n"
+                        f"💰 Сумма: {amount_str} сом\n"
+                        f"🆔 ID: {player_id_str}\n\n"
                         f"⏳ Время на оплату: {timer_text}\n"
                         f"‼️ Оплата строго до копеек\n"
                         f"📸 После оплаты отправьте фото чека"
                     )
+                    
+                    # Применяем премиум эмодзи
+                    text_with_emoji, caption_entities = add_premium_emoji_to_text(updated_text, Config.PREMIUM_EMOJI_MAP)
                     
                     is_photo_message = current_data.get('is_photo_message', False)
                     if is_photo_message:
                         await bot.edit_message_caption(
                             chat_id=chat_id,
                             message_id=message_id,
-                            caption=updated_text,
+                            caption=text_with_emoji,
+                            caption_entities=caption_entities if caption_entities else None,
                             reply_markup=reply_markup,
-                            parse_mode=ParseMode.HTML
+                            parse_mode=None
                         )
                     else:
                         await bot.edit_message_text(
                             chat_id=chat_id,
                             message_id=message_id,
-                            text=updated_text,
+                            text=text_with_emoji,
+                            entities=caption_entities if caption_entities else None,
                             reply_markup=reply_markup,
-                            parse_mode=ParseMode.HTML
+                            parse_mode=None
                         )
                     
                     # Успешное обновление - сбрасываем счетчик ошибок
@@ -172,7 +179,10 @@ async def update_timer(bot: Bot, user_id: int, total_seconds: int, data: dict, m
             
             # Отправляем сообщение об отмене
             try:
-                cancel_text = "⏰ <b>Пополнение отменено, время оплаты прошло</b>\n\n❌ <b>Не переводите по старым реквизитам</b>\n\nНачните заново, нажав на <b>Пополнить</b>"
+                cancel_text = "⏰ Пополнение отменено, время оплаты прошло\n\n❌ Не переводите по старым реквизитам\n\nНачните заново, нажав на Пополнить"
+                
+                # Применяем премиум эмодзи
+                cancel_text_with_emoji, cancel_entities = add_premium_emoji_to_text(cancel_text, Config.PREMIUM_EMOJI_MAP)
                 
                 try:
                     await bot.delete_message(chat_id=chat_id, message_id=message_id)
@@ -180,7 +190,12 @@ async def update_timer(bot: Bot, user_id: int, total_seconds: int, data: dict, m
                 except Exception as delete_error:
                     logger.warning(f"⚠️ Не удалось удалить сообщение с QR-кодом для пользователя {user_id}: {delete_error}")
                 
-                await bot.send_message(chat_id=chat_id, text=cancel_text)
+                await bot.send_message(
+                    chat_id=chat_id, 
+                    text=cancel_text_with_emoji,
+                    entities=cancel_entities if cancel_entities else None,
+                    parse_mode=None
+                )
                 from handlers.start import send_main_menu
                 await send_main_menu(chat_id, "", bot)
             except Exception as e:

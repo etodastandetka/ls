@@ -414,7 +414,7 @@ async def cmd_start(message: Message, state: FSMContext):
             else:
                 # Пытаемся отправить хотя бы простое сообщение
                 try:
-                    await message.answer("Привет! Используйте кнопки меню для работы с ботом.")
+                    await answer_with_custom_text(message, "Привет! Используйте кнопки меню для работы с ботом.")
                 except:
                     pass
     except Exception as main_error:
@@ -423,7 +423,7 @@ async def cmd_start(message: Message, state: FSMContext):
             from utils.premium_emoji import add_premium_emoji_to_text
             error_text = "❌ Произошла ошибка. Попробуйте еще раз или напишите /start"
             text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
-            await message.answer(text_with_emoji, entities=entities if entities else None)
+            await message.answer(text_with_emoji, entities=entities if entities else None, parse_mode=None)
         except:
             pass
 

@@ -497,7 +497,7 @@ async def process_withdraw_code(message: Message, state: FSMContext):
                 else:
                     amount_check_ok = False
                     error_message = result.get('error') or result.get('message') or 'Не удалось проверить код вывода'
-                    await message.answer(f"⚠️ {error_message}")
+                    await answer_with_custom_text(message, f"⚠️ {error_message}")
             elif amount_check_ok:
                 amount_check_ok = False
                 error_message = result.get('error') or result.get('message') or f'Ошибка сервера (статус {response.status_code})'
@@ -505,7 +505,7 @@ async def process_withdraw_code(message: Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка проверки суммы вывода: {e}")
         amount_check_ok = False
-        await message.answer("⚠️ Не удалось проверить сумму вывода. Попробуйте еще раз.")
+        await answer_with_custom_text(message, "⚠️ Не удалось проверить сумму вывода. Попробуйте еще раз.")
     
     if not amount_check_ok:
         if user_id in user_states:
@@ -625,7 +625,7 @@ async def submit_withdraw_request(message: Message, user_id: int, data: dict, wi
             if payment_response.status_code == 200:
                 if result.get('success') is False:
                     error_message = result.get('error') or 'Неизвестная ошибка'
-                    await message.answer(f'❌ {error_message}')
+                    await answer_with_custom_text(message, f'❌ {error_message}')
                     from handlers.start import send_main_menu
                     await send_main_menu(message, message.from_user.first_name)
                     return
