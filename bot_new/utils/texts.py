@@ -204,56 +204,58 @@ def get_text_with_premium_emoji(key: str, lang: str = 'ru', **kwargs) -> tuple[s
         if luxon_pos == -1:
             luxon_pos = text_clean.find('LUX ON')
         
+        # Используем обычный эмодзи как заглушку (будет заменен на премиум логотип)
+        logo_placeholder_emoji = "🔷"  # Временный эмодзи, который заменим на логотип
+        
         if luxon_pos != -1:
-            # Вставляем пробел после "LUX ON!" для логотипа
+            # Вставляем эмодзи-заглушку после "LUX ON!"
             insert_pos = luxon_pos + len('LUX ON!') if 'LUX ON!' in text_clean else luxon_pos + len('LUX ON')
-            text_with_placeholder = text_clean[:insert_pos] + ' ' + text_clean[insert_pos:]
+            text_with_placeholder = text_clean[:insert_pos] + ' ' + logo_placeholder_emoji + text_clean[insert_pos:]
         else:
-            # Если не нашли, добавляем пробел в конец первой строки
+            # Если не нашли, добавляем в конец первой строки
             first_line_end = text_clean.find('\n')
             if first_line_end != -1:
-                text_with_placeholder = text_clean[:first_line_end] + ' ' + text_clean[first_line_end:]
+                text_with_placeholder = text_clean[:first_line_end] + ' ' + logo_placeholder_emoji + text_clean[first_line_end:]
                 insert_pos = first_line_end
             else:
-                text_with_placeholder = text_clean + ' '
+                text_with_placeholder = text_clean + ' ' + logo_placeholder_emoji
                 insert_pos = len(text_clean)
         
-        # Применяем премиум эмодзи к тексту (это создаст entities для обычных эмодзи)
+        # Применяем премиум эмодзи к тексту (это создаст entities для обычных эмодзи, но не для заглушки)
         text_with_emoji, entities = add_premium_emoji_to_text(text_with_placeholder, Config.PREMIUM_EMOJI_MAP)
         
-        # Вычисляем UTF-16 offset для позиции логотипа (пробел после "LUX ON!")
-        logo_utf16_offset = _utf16_offset(text_with_emoji, insert_pos)
-        
-        # Проверяем, что offset не выходит за границы текста
-        text_utf16_len = _utf16_offset(text_with_emoji, len(text_with_emoji))
-        if logo_utf16_offset >= text_utf16_len:
-            # Если offset слишком большой, используем последнюю позицию
-            logo_utf16_offset = text_utf16_len - 1
-        if logo_utf16_offset < 0:
-            logo_utf16_offset = 0
-        
-        # Создаем entity для логотипа (заменяет пробел на позиции insert_pos)
-        logo_entity = MessageEntity(
-            type=MessageEntityType.CUSTOM_EMOJI,
-            offset=logo_utf16_offset,
-            length=1,  # Заменяем один пробел (1 символ в UTF-16)
-            custom_emoji_id="5188543703018408791"
-        )
-        
-        # Проверяем, что entity не перекрывается с другими entities
-        logo_end = logo_utf16_offset + 1
-        valid_entities = []
-        for entity in entities:
-            entity_end = entity.offset + entity.length
-            # Проверяем перекрытие
-            if not (logo_utf16_offset < entity_end and logo_end > entity.offset):
-                valid_entities.append(entity)
-            # Если есть перекрытие, пропускаем это entity (логотип имеет приоритет)
-        
-        # Добавляем entity для логотипа
-        valid_entities.append(logo_entity)
-        entities = valid_entities
-        text = text_with_emoji  # Текст уже правильный, просто добавляем entity
+        # Находим позицию заглушки в тексте
+        logo_pos = text_with_emoji.find(logo_placeholder_emoji)
+        if logo_pos != -1:
+            # Вычисляем UTF-16 offset для позиции логотипа
+            logo_utf16_offset = _utf16_offset(text_with_emoji, logo_pos)
+            logo_utf16_length = _utf16_len(logo_placeholder_emoji)
+            
+            # Создаем entity для логотипа (заменяет заглушку)
+            logo_entity = MessageEntity(
+                type=MessageEntityType.CUSTOM_EMOJI,
+                offset=logo_utf16_offset,
+                length=logo_utf16_length,  # Длина заглушки в UTF-16
+                custom_emoji_id="5188543703018408791"
+            )
+            
+            # Проверяем, что entity не перекрывается с другими entities
+            logo_end = logo_utf16_offset + logo_utf16_length
+            valid_entities = []
+            for entity in entities:
+                entity_end = entity.offset + entity.length
+                # Проверяем перекрытие
+                if not (logo_utf16_offset < entity_end and logo_end > entity.offset):
+                    valid_entities.append(entity)
+                # Если есть перекрытие, пропускаем это entity (логотип имеет приоритет)
+            
+            # Добавляем entity для логотипа
+            valid_entities.append(logo_entity)
+            entities = valid_entities
+            text = text_with_emoji  # Текст уже правильный с заглушкой, entity заменит её на логотип
+        else:
+            # Если заглушка не найдена, просто применяем премиум эмодзи
+            text = text_with_emoji
     else:
         text, entities = add_premium_emoji_to_text(text, Config.PREMIUM_EMOJI_MAP)
     
