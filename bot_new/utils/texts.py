@@ -195,9 +195,30 @@ def get_text_with_premium_emoji(key: str, lang: str = 'ru', **kwargs) -> tuple[s
     
     # Специальная обработка для main_menu_text - добавляем логотип
     if key == 'main_menu_text' and '{logo_emoji}' in text:
-        # Заменяем плейсхолдер на специальный символ-маркер для логотипа
-        logo_marker = "🔷"  # Временный маркер, который заменим на премиум эмодзи
-        text_with_marker = text.replace('{logo_emoji}', logo_marker)
+        # Находим позицию плейсхолдера и заменяем его на маркер
+        # Убираем все варианты плейсхолдера (с пробелами и без)
+        text_clean = text.replace(' {logo_emoji}', '').replace('{logo_emoji} ', '').replace('{logo_emoji}', '')
+        
+        # Находим позицию после "LUX ON!" для вставки логотипа
+        luxon_pos = text_clean.find('LUX ON!')
+        if luxon_pos == -1:
+            luxon_pos = text_clean.find('LUX ON')
+        
+        if luxon_pos != -1:
+            # Вставляем маркер после "LUX ON!"
+            insert_pos = luxon_pos + len('LUX ON!') if 'LUX ON!' in text_clean else luxon_pos + len('LUX ON')
+            logo_marker = "🔷"  # Временный маркер
+            text_with_marker = text_clean[:insert_pos] + ' ' + logo_marker + text_clean[insert_pos:]
+        else:
+            # Если не нашли, просто добавляем маркер в конец первой строки
+            first_line_end = text_clean.find('\n')
+            if first_line_end != -1:
+                text_with_marker = text_clean[:first_line_end] + ' ' + logo_marker + text_clean[first_line_end:]
+            else:
+                text_with_marker = text_clean + ' ' + logo_marker
+            logo_marker = "🔷"
+        
+        # Применяем премиум эмодзи к тексту с маркером
         text_with_emoji, entities = add_premium_emoji_to_text(text_with_marker, Config.PREMIUM_EMOJI_MAP)
         
         # Находим позицию маркера в тексте
@@ -206,8 +227,12 @@ def get_text_with_premium_emoji(key: str, lang: str = 'ru', **kwargs) -> tuple[s
             # Вычисляем UTF-16 offset для логотипа
             logo_utf16_offset = _utf16_offset(text_with_emoji, logo_pos)
             
-            # Удаляем маркер из текста
-            text = text_with_emoji.replace(logo_marker, "")
+            # Удаляем маркер из текста (вместе с пробелом перед ним, если есть)
+            if logo_pos > 0 and text_with_emoji[logo_pos - 1] == ' ':
+                text = text_with_emoji[:logo_pos - 1] + text_with_emoji[logo_pos + len(logo_marker):]
+                logo_utf16_offset -= 1  # Учитываем удаленный пробел
+            else:
+                text = text_with_emoji.replace(logo_marker, "")
             
             # Создаем entity для логотипа
             logo_entity = MessageEntity(
@@ -217,11 +242,12 @@ def get_text_with_premium_emoji(key: str, lang: str = 'ru', **kwargs) -> tuple[s
                 custom_emoji_id="5188543703018408791"
             )
             
-            # Обновляем offset для всех entities после логотипа (маркер занимает 1 символ в UTF-16)
+            # Обновляем offset для всех entities после логотипа
             updated_entities = []
+            marker_len_utf16 = _utf16_offset(text_with_emoji, logo_pos + len(logo_marker)) - logo_utf16_offset
             for entity in entities:
                 if entity.offset > logo_utf16_offset:
-                    entity.offset -= 1
+                    entity.offset -= marker_len_utf16
                 updated_entities.append(entity)
             updated_entities.append(logo_entity)
             entities = updated_entities
