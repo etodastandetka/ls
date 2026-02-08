@@ -99,18 +99,33 @@ async def send_main_menu(message_or_chat_id, user_name: str = "", bot_instance=N
     main_menu_text = get_text('main_menu_text', user_name=safe_name)
     menu_ready_text = get_text('menu_ready_text')
     
+    # Применяем премиум эмодзи к текстам
+    from utils.premium_emoji import add_premium_emoji_to_text
+    main_menu_text_with_emoji, main_menu_entities = add_premium_emoji_to_text(main_menu_text, Config.PREMIUM_EMOJI_MAP)
+    menu_ready_text_with_emoji, menu_ready_entities = add_premium_emoji_to_text(menu_ready_text, Config.PREMIUM_EMOJI_MAP)
+    
     inline_keyboard = get_main_menu_inline_keyboard(Config.WEBSITE_URL)
     
     try:
         logger.info(f"📤 Отправляю inline меню в чат {chat_id}")
-        await bot_to_use.send_message(chat_id=chat_id, text=main_menu_text, reply_markup=inline_keyboard)
+        await bot_to_use.send_message(
+            chat_id=chat_id, 
+            text=main_menu_text_with_emoji, 
+            reply_markup=inline_keyboard,
+            entities=main_menu_entities if main_menu_entities else None
+        )
         logger.info(f"✅ Inline меню отправлено")
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке главного меню: {e}", exc_info=True)
     
     try:
         logger.info(f"📤 Отправляю клавиатуру меню в чат {chat_id}")
-        await bot_to_use.send_message(chat_id=chat_id, text=menu_ready_text, reply_markup=get_main_menu_keyboard())
+        await bot_to_use.send_message(
+            chat_id=chat_id, 
+            text=menu_ready_text_with_emoji, 
+            reply_markup=get_main_menu_keyboard(),
+            entities=menu_ready_entities if menu_ready_entities else None
+        )
         logger.info(f"✅ Клавиатура отправлена")
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке клавиатуры главного меню: {e}", exc_info=True)
