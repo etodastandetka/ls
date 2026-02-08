@@ -115,7 +115,7 @@ async def send_main_menu(message_or_chat_id, user_name: str = "", bot_instance=N
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке клавиатуры главного меню: {e}", exc_info=True)
 
-@router.message(F.text == "/start")
+@router.message(F.text.startswith("/start"))
 async def cmd_start(message: Message, state: FSMContext):
     """Обработчик команды /start"""
     try:
