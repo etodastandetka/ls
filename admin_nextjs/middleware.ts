@@ -225,16 +225,18 @@ export async function middleware(request: NextRequest) {
          const geolocationEnvValue = process.env.GEOLOCATION_ENABLED
          // Проверяем явно: если переменная установлена в 'false' (строка), отключаем
          // Если переменная не установлена или установлена в 'true', включаем
-         const isGeolocationEnabled = geolocationEnvValue !== 'false' && geolocationEnvValue !== '0'
+         // Учитываем возможные варианты: 'false', 'False', 'FALSE', '0', или отсутствие значения
+         const geolocationEnvLower = geolocationEnvValue?.toLowerCase()?.trim()
+         const isGeolocationEnabled = geolocationEnvLower !== 'false' && geolocationEnvLower !== '0' && geolocationEnvLower !== ''
          
          const isGeolocationPage = pathname === '/geolocation'
          const is2FAPage = pathname === '/login/2fa'
          const isApiRoute = pathname.startsWith('/api/')
          const isStaticFile = pathname.startsWith('/_next/') || pathname.startsWith('/favicon')
          
-         // Логируем только при первом запросе или если геолокация отключена (для отладки)
+         // Логируем для отладки (всегда, чтобы видеть состояние)
          if (pathname === '/dashboard' || pathname === '/') {
-           console.log(`🗺️  Геолокация: enabled=${isGeolocationEnabled}, env=${geolocationEnvValue || 'не установлено'}, path=${pathname}, token=${token ? 'yes' : 'no'}`)
+           console.log(`🗺️  Геолокация: enabled=${isGeolocationEnabled}, env="${geolocationEnvValue || 'не установлено'}", envLower="${geolocationEnvLower || 'не установлено'}", path=${pathname}, token=${token ? 'yes' : 'no'}`)
          }
          
          // Пропускаем проверку геолокации для страницы 2FA и если есть валидный токен (пользователь уже авторизован)

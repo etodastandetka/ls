@@ -257,251 +257,116 @@ export async function POST(request: NextRequest) {
     // Логируем для отладки
     console.log(`🔍 Processing QR generation - RequisiteBank: ${requisiteBank || 'null'}, Amount: ${amount}`)
     
-    // Если банк кошелька Bakai, используем base_hash напрямую с обновлением суммы
+    // Если банк кошелька Bakai, генерируем QR с нуля в формате Bakai
     // Сравниваем без учета регистра
     if (requisiteBank && requisiteBank.toUpperCase() === 'BAKAI') {
-      console.log('✅ Detected BAKAI bank, using base_hash update logic')
-      // Проверяем, что base_hash не содержит данные DemirBank (это было бы ошибкой)
-      if (requisite.includes('qr.demirbank.kg') || requisite.toUpperCase().includes('DEMIRBANK')) {
-        const errorResponse = NextResponse.json(
-          { success: false, error: 'Base_hash для Bakai содержит данные DemirBank. Проверьте настройки кошелька в админке.' },
-          { status: 400 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
+      console.log('✅ Detected BAKAI bank, generating QR from scratch using Bakai format')
+      
+      // Для Bakai requisite - это base_hash (шаблон), из которого извлекаем данные
+      // Пример: 00020101021132460011qr.bakai.kg010131016124207011832911213021233120008BAKAIAPP5204653853034175908Ilyas%20T.54051005363044F76
+      
+      // Извлекаем данные из base_hash
+      // 🔐 КРИТИЧНО: Длина в QR коде должна быть в байтах UTF-8 ПОСЛЕ декодирования процентного кодирования
+      let merchantAccountValue = ''
+      let merchantAccountLen = '46' // Дефолтная длина
+      let merchantName = 'BAKAIAPP'
+      let merchantNameLen = '08' // Дефолтная длина
+      
+      // Извлекаем поле 32 (Merchant Account Information) с длиной
+      const field32Match = requisite.match(/^00020101021132(\d{2})(.+?)(?=52)/)
+      if (field32Match) {
+        // Используем длину из base_hash (она уже правильная - в байтах после декодирования)
+        merchantAccountLen = field32Match[1]
+        merchantAccountValue = field32Match[2] // Значение (может содержать процентное кодирование)
+        console.log(`🔍 Extracted merchant account from base_hash: length=${merchantAccountLen}, value=${merchantAccountValue.substring(0, 50)}...`)
+      } else {
+        // Если не нашли, формируем из requisite (если это номер кошелька)
+        if (/^\d+$/.test(requisite)) {
+          // requisite - это номер кошелька, формируем merchant account
+          const walletLen = requisite.length.toString().padStart(2, '0')
+          merchantAccountValue = `0011qr.bakai.kg01013101${walletLen}${requisite}20008BAKAIAPP`
+          // Декодируем и считаем байты для длины (на случай процентного кодирования)
+          let decoded: string
+          try {
+            decoded = decodeURIComponent(merchantAccountValue)
+          } catch (e) {
+            decoded = merchantAccountValue
+          }
+          merchantAccountLen = Buffer.from(decoded, 'utf8').length.toString().padStart(2, '0')
+        } else {
+          // requisite - это base_hash, но не в ожидаемом формате, пробуем извлечь
+          const alt32Match = requisite.match(/32(\d{2})(.+?)(?=52|53|54|59|63)/)
+          if (alt32Match) {
+            merchantAccountLen = alt32Match[1]
+            merchantAccountValue = alt32Match[2]
+          } else {
+            // Используем дефолтную структуру
+            merchantAccountValue = `0011qr.bakai.kg0101310116124207011832911213021233120008BAKAIAPP`
+            let decoded: string
+            try {
+              decoded = decodeURIComponent(merchantAccountValue)
+            } catch (e) {
+              decoded = merchantAccountValue
+            }
+            merchantAccountLen = Buffer.from(decoded, 'utf8').length.toString().padStart(2, '0')
+          }
+        }
       }
       
-      // Для Bakai base_hash может быть любым валидным QR-кодом, поэтому проверяем только наличие полей 54 и 63
+      // Извлекаем поле 59 (Merchant Name) с длиной
+      const field59Match = requisite.match(/59(\d{2})(.+?)(?=54|63|$)/)
+      if (field59Match) {
+        // Используем длину из base_hash (она уже правильная - в байтах после декодирования)
+        merchantNameLen = field59Match[1]
+        merchantName = field59Match[2] // Значение (может содержать процентное кодирование, например %20)
+        console.log(`🔍 Extracted merchant name from base_hash: length=${merchantNameLen}, value=${merchantName}`)
+      } else {
+        // Для дефолтного merchant name декодируем и считаем байты
+        let decoded: string
+        try {
+          decoded = decodeURIComponent(merchantName)
+        } catch (e) {
+          decoded = merchantName
+        }
+        merchantNameLen = Buffer.from(decoded, 'utf8').length.toString().padStart(2, '0')
+      }
       
       // Конвертируем сумму в копейки
       const amountCents = Math.round(amount * 100)
       const amountStr = amountCents.toString()
       const amountLen = amountStr.length.toString().padStart(2, '0')
       
-      // Находим последнее поле 54 перед полем 63 (контрольная сумма)
-      const field54Pattern = /54(\d{2})(\d+)/g
-      const field54Matches: Array<{ index: number; fullMatch: string }> = []
-      let match54
-      while ((match54 = field54Pattern.exec(requisite)) !== null) {
-        field54Matches.push({
-          index: match54.index,
-          fullMatch: match54[0]
-        })
-      }
+      // Формируем payload БЕЗ контрольной суммы (поле 63)
+      const payload = (
+        `000201` +  // 00 - Payload Format Indicator (версия 01)
+        `010211` +  // 01 - Point of Initiation Method (11 = статический QR)
+        `32${merchantAccountLen}${merchantAccountValue}` +  // 32 - Merchant Account
+        `52046538` +  // 52 - Merchant Category Code (6538)
+        `5303417` +   // 53 - Transaction Currency (417 = KGS)
+        `59${merchantNameLen}${merchantName}` +  // 59 - Merchant Name (уже содержит %20 если нужно)
+        `54${amountLen}${amountStr}`  // 54 - Amount (в копейках)
+      )
       
-      console.log(`🔍 Found ${field54Matches.length} field 54 matches in base_hash`)
+      console.log(`📦 BAKAI Payload structure:`)
+      console.log(`   00 (Version): 01`)
+      console.log(`   01 (Type): 11 (static)`)
+      console.log(`   32 (Merchant Account): length=${merchantAccountLen}, value=${merchantAccountValue.substring(0, 40)}...`)
+      console.log(`   52 (MCC): 6538`)
+      console.log(`   53 (Currency): 417 (KGS)`)
+      console.log(`   59 (Merchant Name): length=${merchantNameLen}, value=${merchantName}`)
+      console.log(`   54 (Amount): length=${amountLen}, value=${amountStr} (${amount} сом = ${amountCents} копеек)`)
       
-      if (field54Matches.length === 0) {
-        const errorResponse = NextResponse.json(
-          { success: false, error: 'Не найдено поле 54 в base_hash для Bakai' },
-          { status: 400 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
-      }
+      // Вычисляем SHA256 контрольную сумму от payload (БЕЗ 6304)
+      const checksumFull = createHash('sha256').update(payload, 'utf8').digest('hex')
+      // Берем последние 4 символа в верхнем регистре
+      const checksum = checksumFull.slice(-4).toUpperCase()
       
-      // Находим индекс последнего поля 63 (контрольная сумма) в исходном requisite
-      const originalLast63Index = requisite.lastIndexOf('6304')
-      if (originalLast63Index === -1) {
-        const errorResponse = NextResponse.json(
-          { success: false, error: 'Не найдено поле 63 в base_hash для Bakai' },
-          { status: 400 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
-      }
+      console.log(`🔐 SHA-256 checksum calculated: ${checksumFull.substring(0, 20)}...${checksumFull.slice(-4)} (last 4: ${checksum})`)
       
-      // Проверяем, что поле 63 действительно находится после всех полей 54
-      const lastField54Index = field54Matches[field54Matches.length - 1].index
-      if (originalLast63Index <= lastField54Index) {
-        console.warn(`⚠️ Field 63 (index ${originalLast63Index}) is before last field 54 (index ${lastField54Index})`)
-      }
-      
-      console.log(`🔍 Field 63 found at index ${originalLast63Index}`)
-      console.log(`🔍 Last field 54 at index ${lastField54Index}, field 63 at index ${originalLast63Index}`)
-      console.log(`🔍 Requisite structure: ...${requisite.substring(Math.max(0, lastField54Index - 10), originalLast63Index + 20)}...`)
-      
-      // Находим последнее поле 54 перед полем 63
-      const lastField54Before63 = field54Matches
-        .filter(m => m.index < originalLast63Index)
-        .sort((a, b) => b.index - a.index)[0]
-      
-      if (!lastField54Before63) {
-        const errorResponse = NextResponse.json(
-          { success: false, error: 'Не найдено поле 54 перед полем 63 в base_hash для Bakai' },
-          { status: 400 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
-      }
-      
-      console.log(`🔍 Last field 54 before 63: "${lastField54Before63.fullMatch}" at index ${lastField54Before63.index}`)
-      console.log(`🔍 Requisite before update: ${requisite.substring(0, 50)}...${requisite.slice(-30)}`)
-      
-      // Заменяем последнее поле 54 на новое значение
-      const oldField54 = lastField54Before63.fullMatch
-      const newField54 = `54${amountLen}${amountStr}`
-      
-      console.log(`💰 Updating field 54: "${oldField54}" -> "${newField54}" (amount: ${amount}, cents: ${amountCents})`)
-      console.log(`🔍 Old field 54 length: ${oldField54.length}, new field 54 length: ${newField54.length}`)
-      
-      // Заменяем последнее вхождение поля 54 (перед полем 63)
-      const before54 = requisite.substring(0, lastField54Before63.index)
-      const after54 = requisite.substring(lastField54Before63.index + oldField54.length)
-      let updatedHash = before54 + newField54 + after54
-      
-      console.log(`🔍 Replacement details:`)
-      console.log(`   Before 54: ...${before54.slice(-20)}`)
-      console.log(`   New 54: ${newField54}`)
-      console.log(`   After 54: ${after54.substring(0, 30)}...`)
-      
-      // 🔐 КРИТИЧНО: Пересчитываем индекс поля 63 после замены поля 54
-      // Длина нового поля 54 может отличаться от старого, поэтому индекс 63 может сместиться
-      const lengthDiff = newField54.length - oldField54.length
-      const calculatedNew63Index = originalLast63Index + lengthDiff
-      
-      console.log(`🔍 Field 54 length change: ${oldField54.length} -> ${newField54.length} (diff: ${lengthDiff})`)
-      console.log(`🔍 Field 63 calculated index: ${originalLast63Index} -> ${calculatedNew63Index}`)
-      console.log(`🔍 Updated hash preview: ${updatedHash.substring(0, 50)}...${updatedHash.slice(-30)}`)
-      
-      // 🔐 КРИТИЧНО: Находим поле 63 в обновленном hash заново (не полагаемся только на расчет)
-      // Ищем последнее вхождение "6304" в обновленном hash
-      let newLast63Index = updatedHash.lastIndexOf('6304')
-      
-      // Если не нашли по последнему вхождению, пробуем найти по расчетному индексу
-      if (newLast63Index === -1) {
-        console.warn(`⚠️ Field 63 not found at last index, trying calculated index ${calculatedNew63Index}`)
-        if (calculatedNew63Index >= 0 && calculatedNew63Index < updatedHash.length && 
-            updatedHash.substring(calculatedNew63Index, calculatedNew63Index + 4) === '6304') {
-          newLast63Index = calculatedNew63Index
-          console.log(`✅ Field 63 found at calculated index ${newLast63Index}`)
-        } else {
-          // Пробуем найти любое вхождение 6304 после замены поля 54
-          const all63Matches: number[] = []
-          let searchIndex = 0
-          while ((searchIndex = updatedHash.indexOf('6304', searchIndex)) !== -1) {
-            all63Matches.push(searchIndex)
-            searchIndex += 4
-          }
-          console.log(`🔍 All 6304 matches found: ${all63Matches.join(', ')}`)
-          
-          if (all63Matches.length === 0) {
-            const errorResponse = NextResponse.json(
-              { success: false, error: 'Ошибка: поле 63 не найдено после замены поля 54' },
-              { status: 500 }
-            )
-            errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-            return errorResponse
-          }
-          
-          // Используем последнее вхождение
-          newLast63Index = all63Matches[all63Matches.length - 1]
-          console.log(`✅ Using last 6304 match at index ${newLast63Index}`)
-        }
-      }
-      
-      // Проверяем, что поле 63 найдено и валидно
-      if (newLast63Index === -1 || updatedHash.substring(newLast63Index, newLast63Index + 4) !== '6304') {
-        const errorResponse = NextResponse.json(
-          { success: false, error: 'Ошибка: поле 63 не найдено после замены поля 54' },
-          { status: 500 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
-      }
-      
-      console.log(`✅ Field 63 confirmed at index ${newLast63Index} in updated hash`)
-      
-      // 🔐 КРИТИЧНО: Находим длину старого поля 63 (обычно 8 символов: 6304 + 4 hex)
-      // Извлекаем старое поле 63 из исходного requisite для определения его длины
-      const oldField63Match = requisite.substring(originalLast63Index).match(/^6304([0-9A-Fa-f]{4})/)
-      const oldField63Length = oldField63Match ? oldField63Match[0].length : 8 // По умолчанию 8 символов
-      
-      // Сохраняем все что было после старого поля 63 в исходном requisite
-      const dataAfterOld63 = requisite.substring(originalLast63Index + oldField63Length)
-      
-      console.log(`🔍 Old field 63 length: ${oldField63Length}, data after: "${dataAfterOld63.substring(0, 20)}..."`)
-      
-      // Извлекаем данные до последнего объекта 63 (ID "00" - "90", исключая ID 63)
-      // ВАЖНО: Используем новый индекс после замены поля 54
-      let dataBefore63 = updatedHash.substring(0, newLast63Index)
-      
-      // 🔐 КРИТИЧЕСКАЯ ПРОВЕРКА: Убеждаемся, что сумма (поле 54) включена в данные для hash
-      if (!dataBefore63.includes(newField54)) {
-        const errorResponse = NextResponse.json(
-          { success: false, error: 'Ошибка: сумма не включена в данные для контрольной суммы' },
-          { status: 500 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
-      }
-      
-      console.log(`🔍 Data before field 63 length: ${dataBefore63.length} chars`)
-      console.log(`✅ Проверка: сумма (${newField54}) включена в данные для hash`)
-      
-      // 🔐 АЛГОРИТМ ФОРМИРОВАНИЯ КОНТРОЛЬНОЙ СУММЫ (поле 63):
-      // 1. Все значения деталей платежа до объекта 63 (ID "00" - "90", исключая ID 63) 
-      //    преобразуются в одну строку (уже есть в dataBefore63)
-      // 2. Строка данных переводится в массив байт с кодировкой UTF-8
-      // 3. Вычисляется хеш массива, используя алгоритм SHA256
-      // 4. Массив байт преобразуется в строку (hex)
-      // 5. Удаляются все символы "-", если они есть
-      // 6. Из строки берутся последние 4 символа
-      
-      // Шаг 2: Декодируем процентное кодирование (%20 -> пробел и т.д.)
-      // ВАЖНО: Процентное кодирование используется для символов, выходящих за пределы ASCII
-      // Символы, которые НЕ кодируются: ":", "/", "?", "#", "[", "]", "@", "!", "$", "&", 
-      // "'", " ", "(", ")", "*", "+", ",", ";", "=", ALPHA, DIGIT, HEXDIG, "-", ".", "_", "~"
-      let decodedDataBefore63: string
-      try {
-        // Декодируем процентное кодирование (например, %20 -> пробел)
-        decodedDataBefore63 = decodeURIComponent(dataBefore63)
-        console.log(`🔍 Percent-encoded data decoded: ${dataBefore63.length} -> ${decodedDataBefore63.length} chars`)
-      } catch (e: any) {
-        // Если декодирование не удалось (невалидные последовательности), используем исходную строку
-        console.warn(`⚠️ Could not decode URI component: ${e?.message}, using original string`)
-        decodedDataBefore63 = dataBefore63
-      }
-      
-      // Шаг 3: Вычисляем SHA256 хеш от массива байт UTF-8
-      // createHash('sha256').update() автоматически конвертирует строку в UTF-8 байты
-      // Сумма уже включена в decodedDataBefore63 через поле 54, поэтому hash защищает от изменения суммы
-      const checksumFull = createHash('sha256').update(decodedDataBefore63, 'utf8').digest('hex')
-      
-      // Шаг 4: Массив байт уже преобразован в строку (hex) через .digest('hex')
-      // Шаг 5: Удаляем все символы "-" если есть (хотя в hex их обычно нет)
-      const checksumCleaned = checksumFull.replace(/-/g, '')
-      
-      // Шаг 6: Из строки берутся последние 4 символа (в верхнем регистре для hex)
-      const checksum = checksumCleaned.slice(-4).toUpperCase()
-      
-      console.log(`🔐 SHA-256 checksum calculated:`)
-      console.log(`   Full hash: ${checksumFull.substring(0, 20)}...${checksumFull.slice(-4)}`)
-      console.log(`   After removing "-": ${checksumCleaned.substring(0, 20)}...${checksumCleaned.slice(-4)}`)
-      console.log(`   Last 4 chars (checksum): ${checksum}`)
-      
-      // Заменяем последнее поле 63 (контрольная сумма) - формат: 6304 + 4 символа hex
-      // Формат поля 63: ID "63" + длина "04" + значение (4 hex символа: буквы A-F и цифры 0-9)
-      // ВАЖНО: Используем новый индекс после замены поля 54
-      // 🔐 КРИТИЧНО: Сохраняем все что было после старого поля 63
-      const newField63 = `6304${checksum}`
-      
-      // Проверяем, что checksum содержит только hex символы (0-9, A-F)
-      if (!/^[0-9A-F]{4}$/.test(checksum)) {
-        const errorResponse = NextResponse.json(
-          { success: false, error: `Ошибка: невалидный checksum для поля 63: ${checksum}` },
-          { status: 500 }
-        )
-        errorResponse.headers.set('Access-Control-Allow-Origin', '*')
-        return errorResponse
-      }
-      
-      qrHash = updatedHash.substring(0, newLast63Index) + newField63 + dataAfterOld63
+      // Полный QR хеш: payload + '6304' + checksum
+      qrHash = payload + '6304' + checksum
       
       console.log(`✅ BAKAI QR hash generated successfully`)
-      console.log(`   Old field 63: ${requisite.substring(originalLast63Index, originalLast63Index + oldField63Length)}`)
-      console.log(`   New field 63: ${newField63} (ID: 63, Length: 04, Value: ${checksum})`)
-      console.log(`   Data after field 63: "${dataAfterOld63.substring(0, 20)}${dataAfterOld63.length > 20 ? '...' : ''}"`)
       console.log(`   Final hash preview: ${qrHash.substring(0, 50)}...${qrHash.slice(-20)}`)
     } else {
       // Для Demir Bank используем существующую логику

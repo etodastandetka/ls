@@ -308,7 +308,7 @@ function DepositStep2Content() {
             setMinAmount(resolvedMinAmount)
           } else {
             if (bookmaker === '1win') {
-              setMinAmount(100)
+            setMinAmount(100)
             } else if (bookmaker === 'mostbet') {
               setMinAmount(400)
             }

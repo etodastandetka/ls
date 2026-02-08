@@ -92,73 +92,68 @@ export async function POST(
       },
     })
 
-    // Проверяем, совпадает ли сумма платежа с суммой заявки
+    // Получаем заявку для обновления суммы
     const linkedRequest = await prisma.request.findUnique({
       where: { id: parseInt(requestId) },
     })
 
     if (linkedRequest) {
       const paymentAmount = parseFloat(updatedPayment.amount.toString())
-      const requestAmount = parseFloat(linkedRequest.amount?.toString() || '0')
       
-      // Если сумма совпадает (с точностью до 1 копейки), автоматически обновляем статус заявки
-      if (Math.abs(paymentAmount - requestAmount) < 0.01) {
-        // Обновляем статус заявки на completed (успешно)
-        // Сохраняем логин админа, который привязал платеж
-        const updatedRequest = await prisma.request.update({
-          where: { id: parseInt(requestId) },
-          data: {
-            status: 'completed',
-            statusDetail: null,
-            processedBy: authUser.username as any,
-            processedAt: new Date(),
-            updatedAt: new Date(),
-          } as any,
-        })
+      // Обновляем сумму заявки на сумму из пополнения и статус заявки на completed
+      const updatedRequest = await prisma.request.update({
+        where: { id: parseInt(requestId) },
+        data: {
+          amount: paymentAmount,
+          status: 'completed',
+          statusDetail: null,
+          processedBy: authUser.username as any,
+          processedAt: new Date(),
+          updatedAt: new Date(),
+        } as any,
+      })
 
-        
-        // Если это депозит, пополняем баланс через казино API
-        if (linkedRequest.requestType === 'deposit' && linkedRequest.bookmaker && linkedRequest.accountId) {
-          try {
-            const { depositToCasino } = await import('../../../../../lib/deposit-balance')
-            await depositToCasino(
-              linkedRequest.bookmaker,
-              linkedRequest.accountId,
-              requestAmount,
-              parseInt(requestId) // Передаем requestId чтобы исключить текущую заявку из проверки на дублирование
-            )
-            console.log(`✅ Auto-deposit successful after linking payment: Request ${requestId}, Account ${linkedRequest.accountId}`)
-            
-            // Начисляем реферальные бонусы (2% от депозита)
-            if (linkedRequest.userId && linkedRequest.amount) {
-              processReferralEarning(
-                linkedRequest.userId,
-                requestAmount,
-                linkedRequest.bookmaker,
-                parseInt(requestId),
-                linkedRequest.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
-              ).catch(error => {
-                console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
-                // Не блокируем выполнение, если начисление бонусов не удалось
-              })
-            }
-          } catch (error: any) {
-            console.error(`❌ Auto-deposit failed after linking payment:`, error)
-            // Не возвращаем ошибку, т.к. платеж уже привязан
-          }
-        } else if (linkedRequest.requestType === 'deposit' && linkedRequest.userId && linkedRequest.amount) {
-          // Если это депозит, но нет accountId/bookmaker, все равно начисляем реферальные бонусы
-          processReferralEarning(
-            linkedRequest.userId,
-            requestAmount,
+      // Если это депозит, пополняем баланс через казино API
+      if (linkedRequest.requestType === 'deposit' && linkedRequest.bookmaker && linkedRequest.accountId) {
+        try {
+          const { depositToCasino } = await import('../../../../../lib/deposit-balance')
+          await depositToCasino(
             linkedRequest.bookmaker,
-            parseInt(requestId),
-            linkedRequest.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
-          ).catch(error => {
-            console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
-            // Не блокируем выполнение, если начисление бонусов не удалось
-          })
+            linkedRequest.accountId,
+            paymentAmount,
+            parseInt(requestId) // Передаем requestId чтобы исключить текущую заявку из проверки на дублирование
+          )
+          console.log(`✅ Auto-deposit successful after linking payment: Request ${requestId}, Account ${linkedRequest.accountId}`)
+          
+          // Начисляем реферальные бонусы (2% от депозита)
+          if (linkedRequest.userId) {
+            processReferralEarning(
+              linkedRequest.userId,
+              paymentAmount,
+              linkedRequest.bookmaker,
+              parseInt(requestId),
+              linkedRequest.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
+            ).catch(error => {
+              console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
+              // Не блокируем выполнение, если начисление бонусов не удалось
+            })
+          }
+        } catch (error: any) {
+          console.error(`❌ Auto-deposit failed after linking payment:`, error)
+          // Не возвращаем ошибку, т.к. платеж уже привязан
         }
+      } else if (linkedRequest.requestType === 'deposit' && linkedRequest.userId) {
+        // Если это депозит, но нет accountId/bookmaker, все равно начисляем реферальные бонусы
+        processReferralEarning(
+          linkedRequest.userId,
+          paymentAmount,
+          linkedRequest.bookmaker,
+          parseInt(requestId),
+          linkedRequest.createdAt || undefined // Передаем дату создания депозита для защиты от абуза
+        ).catch(error => {
+          console.error(`❌ [Link Payment] Failed to process referral earning:`, error)
+          // Не блокируем выполнение, если начисление бонусов не удалось
+        })
       }
     }
 
