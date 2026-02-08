@@ -156,3 +156,17 @@ def get_text(key: str, lang: str = 'ru', **kwargs) -> str:
         return text
 
 
+def get_text_with_premium_emoji(key: str, lang: str = 'ru', **kwargs) -> tuple[str, list]:
+    """Получает текст с премиум эмодзи
+    
+    Returns:
+        tuple: (текст, список entities для премиум эмодзи)
+    """
+    from utils.premium_emoji import add_premium_emoji_to_text
+    from config import Config
+    
+    text = get_text(key, lang, **kwargs)
+    text_with_emoji, entities = add_premium_emoji_to_text(text, Config.PREMIUM_EMOJI_MAP)
+    return text_with_emoji, entities
+
+

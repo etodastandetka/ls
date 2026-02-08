@@ -66,28 +66,40 @@ async def cancel_request_text(message: Message, state: FSMContext):
 @router.message(F.text.in_([get_text('support'), "👨‍💻 Тех поддержка"]))
 async def support_handler(message: Message):
     """Обработка кнопки поддержки"""
+    from utils.premium_emoji import add_premium_emoji_to_text
     keyboard = get_support_keyboard(Config.SUPPORT_BOT_URL)
+    support_text = "👨‍💻 <b>Техническая поддержка</b>\n\nНажмите на кнопку ниже, чтобы открыть раздел поддержки:"
+    text_with_emoji, entities = add_premium_emoji_to_text(support_text, Config.PREMIUM_EMOJI_MAP)
     await message.answer(
-        "👨‍💻 <b>Техническая поддержка</b>\n\nНажмите на кнопку ниже, чтобы открыть раздел поддержки:",
-        reply_markup=keyboard
+        text_with_emoji,
+        reply_markup=keyboard,
+        entities=entities if entities else None
     )
 
 @router.message(F.text == "📊 История")
 async def history_handler(message: Message):
     """Обработка кнопки истории"""
+    from utils.premium_emoji import add_premium_emoji_to_text
     keyboard = get_history_keyboard(Config.WEBSITE_URL)
+    history_text = "📊 <b>История транзакций</b>\n\nНажмите на кнопку ниже, чтобы открыть историю ваших транзакций:"
+    text_with_emoji, entities = add_premium_emoji_to_text(history_text, Config.PREMIUM_EMOJI_MAP)
     await message.answer(
-        "📊 <b>История транзакций</b>\n\nНажмите на кнопку ниже, чтобы открыть историю ваших транзакций:",
-        reply_markup=keyboard
+        text_with_emoji,
+        reply_markup=keyboard,
+        entities=entities if entities else None
     )
 
 @router.message(F.text.in_([get_text('faq'), "📖 Инструкция"]))
 async def faq_handler(message: Message):
     """Обработка кнопки инструкции"""
+    from utils.premium_emoji import add_premium_emoji_to_text
     keyboard = get_faq_keyboard(Config.WEBSITE_URL)
+    faq_text = "📖 <b>Инструкция</b>\n\nНажмите на кнопку ниже, чтобы открыть инструкцию:"
+    text_with_emoji, entities = add_premium_emoji_to_text(faq_text, Config.PREMIUM_EMOJI_MAP)
     await message.answer(
-        "📖 <b>Инструкция</b>\n\nНажмите на кнопку ниже, чтобы открыть инструкцию:",
-        reply_markup=keyboard
+        text_with_emoji,
+        reply_markup=keyboard,
+        entities=entities if entities else None
     )
 
 @router.message()
@@ -116,8 +128,12 @@ async def handle_other_messages(message: Message, state: FSMContext):
             )
         ):
             if user_id not in user_states:
+                from utils.premium_emoji import add_premium_emoji_to_text
+                error_text = "❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново."
+                text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
                 await message.answer(
-                    "❌ Нет активной заявки для фото чека. Нажмите «Пополнить» и пройдите шаги заново."
+                    text_with_emoji,
+                    entities=entities if entities else None
                 )
                 return
         
@@ -127,7 +143,10 @@ async def handle_other_messages(message: Message, state: FSMContext):
             if not is_valid:
                 logger.warning(f"🚫 Invalid input from user {user_id}: {error_msg}")
                 try:
-                    await message.answer("⚠️ Сообщение содержит недопустимые символы. Пожалуйста, отправьте корректное сообщение.")
+                    from utils.premium_emoji import add_premium_emoji_to_text
+                    warning_text = "⚠️ Сообщение содержит недопустимые символы. Пожалуйста, отправьте корректное сообщение."
+                    text_with_emoji, entities = add_premium_emoji_to_text(warning_text, Config.PREMIUM_EMOJI_MAP)
+                    await message.answer(text_with_emoji, entities=entities if entities else None)
                 except:
                     pass
                 return

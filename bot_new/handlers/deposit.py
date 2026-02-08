@@ -55,8 +55,11 @@ async def start_deposit(message: Message, state: FSMContext):
         # Проверяем паузу
         try:
             if settings.get('pause', False):
+                from utils.premium_emoji import add_premium_emoji_to_text
                 maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
-                await message.answer(f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}")
+                pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
+                text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
+                await message.answer(text_with_emoji, entities=entities if entities else None)
                 return
         except Exception as pause_error:
             logger.error(f"❌ Ошибка при проверке паузы: {pause_error}")
@@ -64,7 +67,9 @@ async def start_deposit(message: Message, state: FSMContext):
         # Проверяем, включены ли депозиты
         try:
             if not settings.get('deposits_enabled', True):
-                await message.answer(get_text('deposit_disabled'))
+                from utils.texts import get_text_with_premium_emoji
+                text, entities = get_text_with_premium_emoji('deposit_disabled')
+                await message.answer(text, entities=entities if entities else None)
                 return
         except Exception as deposit_check_error:
             logger.error(f"❌ Ошибка при проверке депозитов: {deposit_check_error}")
@@ -86,7 +91,10 @@ async def start_deposit(message: Message, state: FSMContext):
                         has_pending = result.get('data', {}).get('hasPending', False)
                         if has_pending:
                             # У пользователя есть активная заявка на пополнение
-                            await message.answer("⚠️ У вас есть ожидающая заявка на пополнение. Дождитесь обработки текущей заявки перед созданием новой.")
+                            from utils.premium_emoji import add_premium_emoji_to_text
+                            warning_text = "⚠️ У вас есть ожидающая заявка на пополнение. Дождитесь обработки текущей заявки перед созданием новой."
+                            text_with_emoji, entities = add_premium_emoji_to_text(warning_text, Config.PREMIUM_EMOJI_MAP)
+                            await message.answer(text_with_emoji, entities=entities if entities else None)
                             return
         except Exception as check_error:
             logger.warning(f"⚠️ Не удалось проверить активные заявки: {check_error}")

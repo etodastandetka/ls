@@ -46,6 +46,7 @@ async def check_channel_subscription(user_id: int, channel_id: str) -> bool:
 async def send_channel_subscription_message(message: Message, channel_username: str, channel_id: str) -> None:
     """Отправляет сообщение с кнопками для подписки на канал"""
     from utils.keyboards import get_channel_subscription_keyboard
+    from utils.premium_emoji import add_premium_emoji_to_text
     
     channel_url = f"https://t.me/{channel_username.lstrip('@')}"
     keyboard = get_channel_subscription_keyboard(channel_username, channel_id)
@@ -58,8 +59,11 @@ async def send_channel_subscription_message(message: Message, channel_username: 
 
 После подписки нажмите кнопку "✅ Проверить подписку"."""
     
+    # Применяем премиум эмодзи
+    text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
+    
     try:
-        await message.answer(message_text, reply_markup=keyboard)
+        await message.answer(text_with_emoji, reply_markup=keyboard, entities=entities if entities else None)
         logger.info(f"✅ Сообщение о подписке отправлено пользователю {message.from_user.id}")
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке сообщения о подписке: {e}")
@@ -180,8 +184,11 @@ async def cmd_start(message: Message, state: FSMContext):
         # Проверяем паузу
         try:
             if settings.get('pause', False):
+                from utils.premium_emoji import add_premium_emoji_to_text
                 maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
-                await message.answer(f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}")
+                pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
+                text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
+                await message.answer(text_with_emoji, entities=entities if entities else None)
                 logger.info(f"⏸️ Бот на паузе, пользователь {user_id} получил сообщение о технических работах")
                 return
         except Exception as pause_error:
@@ -263,7 +270,10 @@ async def cmd_start(message: Message, state: FSMContext):
                 if not referral_code or not referral_code.strip().isdigit():
                     logger.warning(f"⚠️ Неверный формат реферального кода '{param}' (извлечен: '{referral_code}')")
                     try:
-                        await message.answer("⚠️ Неверный формат реферальной ссылки.")
+                        from utils.premium_emoji import add_premium_emoji_to_text
+                        error_text = "⚠️ Неверный формат реферальной ссылки."
+                        text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
+                        await message.answer(text_with_emoji, entities=entities if entities else None)
                     except:
                         pass
                 else:
@@ -274,7 +284,10 @@ async def cmd_start(message: Message, state: FSMContext):
                         if referrer_id == user_id:
                             logger.warning(f"⚠️ Пользователь {user_id} пытается пригласить самого себя")
                             try:
-                                await message.answer("❌ Вы не можете использовать свою собственную реферальную ссылку.")
+                                from utils.premium_emoji import add_premium_emoji_to_text
+                                error_text = "❌ Вы не можете использовать свою собственную реферальную ссылку."
+                                text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
+                                await message.answer(text_with_emoji, entities=entities if entities else None)
                             except:
                                 pass
                         else:
@@ -362,7 +375,10 @@ async def cmd_start(message: Message, state: FSMContext):
                     except ValueError as e:
                         logger.error(f"❌ Неверный формат реферального кода '{referral_code}': {e}")
                         try:
-                            await message.answer("⚠️ Неверный формат реферальной ссылки.")
+                            from utils.premium_emoji import add_premium_emoji_to_text
+                            error_text = "⚠️ Неверный формат реферальной ссылки."
+                            text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
+                            await message.answer(text_with_emoji, entities=entities if entities else None)
                         except:
                             pass
     
@@ -402,7 +418,10 @@ async def cmd_start(message: Message, state: FSMContext):
     except Exception as main_error:
         logger.error(f"❌ Критическая ошибка в обработчике /start для пользователя {user_id}: {main_error}", exc_info=True)
         try:
-            await message.answer("❌ Произошла ошибка. Попробуйте еще раз или напишите /start")
+            from utils.premium_emoji import add_premium_emoji_to_text
+            error_text = "❌ Произошла ошибка. Попробуйте еще раз или напишите /start"
+            text_with_emoji, entities = add_premium_emoji_to_text(error_text, Config.PREMIUM_EMOJI_MAP)
+            await message.answer(text_with_emoji, entities=entities if entities else None)
         except:
             pass
 
