@@ -100,13 +100,10 @@ async def send_main_menu(message_or_chat_id, user_name: str = "", bot_instance=N
         bot_to_use = bot_instance or bot
     
     safe_name = user_name if user_name else "друг"
-    main_menu_text = get_text('main_menu_text', user_name=safe_name)
-    menu_ready_text = get_text('menu_ready_text')
-    
-    # Применяем премиум эмодзи к текстам
-    from utils.premium_emoji import add_premium_emoji_to_text
-    main_menu_text_with_emoji, main_menu_entities = add_premium_emoji_to_text(main_menu_text, Config.PREMIUM_EMOJI_MAP)
-    menu_ready_text_with_emoji, menu_ready_entities = add_premium_emoji_to_text(menu_ready_text, Config.PREMIUM_EMOJI_MAP)
+    # Используем get_text_with_premium_emoji для main_menu_text, чтобы обработать логотип
+    main_menu_text_with_emoji, main_menu_entities = get_text_with_premium_emoji('main_menu_text', user_name=safe_name)
+    menu_ready_text, menu_ready_entities_temp = get_text_with_premium_emoji('menu_ready_text')
+    menu_ready_text_with_emoji, menu_ready_entities = get_text_with_premium_emoji('menu_ready_text')
     
     inline_keyboard = get_main_menu_inline_keyboard(Config.WEBSITE_URL)
     
