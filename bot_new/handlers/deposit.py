@@ -57,7 +57,6 @@ async def start_deposit(message: Message, state: FSMContext):
         # Проверяем паузу
         try:
             if settings.get('pause', False):
-                from utils.premium_emoji import add_premium_emoji_to_text
                 maintenance_message = settings.get('maintenance_message', 'Технические работы. Попробуйте позже.')
                 pause_text = f"⏸️ <b>Бот на паузе</b>\n\n{maintenance_message}"
                 text_with_emoji, entities = add_premium_emoji_to_text(pause_text, Config.PREMIUM_EMOJI_MAP)
@@ -92,7 +91,6 @@ async def start_deposit(message: Message, state: FSMContext):
                         has_pending = result.get('data', {}).get('hasPending', False)
                         if has_pending:
                             # У пользователя есть активная заявка на пополнение
-                            from utils.premium_emoji import add_premium_emoji_to_text
                             warning_text = "⚠️ У вас есть ожидающая заявка на пополнение. Дождитесь обработки текущей заявки перед созданием новой."
                             text_with_emoji, entities = add_premium_emoji_to_text(warning_text, Config.PREMIUM_EMOJI_MAP)
                             await message.answer(text_with_emoji, entities=entities if entities else None)
