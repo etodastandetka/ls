@@ -156,10 +156,15 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
     reply_markup = ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True, one_time_keyboard=False)
     
     casino_name = get_casino_name(bookmaker)
-    withdraw_title = get_text('withdraw_title')
+    withdraw_title, title_entities = get_text_with_premium_emoji('withdraw_title')
     casino_label = get_text('casino_label', casino_name=casino_name)
     enter_phone = get_text('enter_phone')
-    await message.answer(f"{withdraw_title}\n\n{casino_label}\n\n{enter_phone}", reply_markup=reply_markup)
+    menu_text = f"{withdraw_title}\n\n{casino_label}\n\n{enter_phone}"
+    text_with_emoji, entities = add_premium_emoji_to_text(menu_text, Config.PREMIUM_EMOJI_MAP)
+    all_entities = list(title_entities) if title_entities else []
+    if entities:
+        all_entities.extend(entities)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
 
 @router.message(WithdrawStates.phone)
 async def process_withdraw_phone(message: Message, state: FSMContext):
@@ -272,10 +277,10 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
     reply_markup = ReplyKeyboardMarkup(keyboard=keyboard_buttons, resize_keyboard=True, one_time_keyboard=False)
     
     casino_name = get_casino_name(user_states[user_id]['data'].get('bookmaker', ''))
-    withdraw_title = get_text('withdraw_title')
+    withdraw_title, title_entities = get_text_with_premium_emoji('withdraw_title')
     casino_label = get_text('casino_label', casino_name=casino_name)
     phone_label = get_text('phone_label', phone=user_states[user_id]['data'].get('phone', ''))
-    qr_received = get_text('qr_received')
+    qr_received, qr_entities = get_text_with_premium_emoji('qr_received')
     enter_account_id = get_text('enter_account_id')
     
     message_text = f"{withdraw_title}\n\n{casino_label}\n{phone_label}\n{qr_received}\n\n{enter_account_id}"
@@ -354,6 +359,7 @@ async def process_withdraw_player_id(message: Message, state: FSMContext):
     phone_label = get_text('phone_label', phone=user_states[user_id]['data'].get('phone', ''))
     account_id_label = f"🆔 ID игрока: {user_states[user_id]['data'].get('player_id', '')}"
     
+    withdraw_title, title_entities = get_text_with_premium_emoji('withdraw_title')
     instruction_text = f"""{withdraw_title}
 
 {casino_label}
@@ -370,7 +376,11 @@ async def process_withdraw_player_id(message: Message, state: FSMContext):
 📍6. Получить Код!
 📍7. Отправить его нам"""
     
-    await message.answer(instruction_text, reply_markup=reply_markup)
+    text_with_emoji, entities = add_premium_emoji_to_text(instruction_text, Config.PREMIUM_EMOJI_MAP)
+    all_entities = list(title_entities) if title_entities else []
+    if entities:
+        all_entities.extend(entities)
+    await message.answer(text_with_emoji, reply_markup=reply_markup, entities=all_entities if all_entities else None)
 
 @router.message(WithdrawStates.code)
 async def process_withdraw_code(message: Message, state: FSMContext):
