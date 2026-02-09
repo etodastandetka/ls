@@ -195,12 +195,27 @@ export async function GET(request: NextRequest) {
       chartStartDate = new Date(startDate)
       chartStartDate.setHours(0, 0, 0, 0)
       chartEndDate = new Date(endDate)
-      chartEndDate.setHours(23, 59, 59, 999)
+      
+      // Если период включает сегодня, используем текущее время для графика
+      // чтобы показать данные за сегодня до текущего момента
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const endPeriodDate = new Date(endDate)
+      endPeriodDate.setHours(0, 0, 0, 0)
+      
+      if (endPeriodDate >= today) {
+        // Период включает сегодня - используем текущее время
+        chartEndDate = new Date()
+      } else {
+        // Период в прошлом - используем конец дня
+        chartEndDate.setHours(23, 59, 59, 999)
+      }
     } else {
+      // Период не выбран - показываем последние 30 дней до текущего момента
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       chartStartDate = thirtyDaysAgo
-      chartEndDate = new Date()
+      chartEndDate = new Date() // Текущее время
     }
     
     // Получаем настройки казино, статистику по платформам и данные графика параллельно
@@ -397,8 +412,15 @@ export async function GET(request: NextRequest) {
     // Обрабатываем данные графика (получены параллельно выше)
     // ВАЖНО: Теперь используем суммы вместо количества
     const chartDataSafe = chartData || []
+    console.log(`📊 [Limits Stats] Chart data received: ${chartDataSafe.length} rows`)
+    if (chartDataSafe.length > 0) {
+      console.log(`📊 [Limits Stats] Chart data sample:`, chartDataSafe.slice(0, 3))
+    }
+    
     const depositsByDate = chartDataSafe.map((d: any) => ({ date: d.date, sum: parseFloat(d.deposit_sum || '0') }))
     const withdrawalsByDate = chartDataSafe.map((d: any) => ({ date: d.date, sum: parseFloat(d.withdrawal_sum || '0') }))
+    
+    console.log(`📊 [Limits Stats] Chart date range: ${chartStartDate.toISOString()} to ${chartEndDate.toISOString()}`)
 
     // Форматируем даты для графика (YYYY-MM-DD -> dd.mm)
     const formatDate = (dateStr: string) => {
