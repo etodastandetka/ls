@@ -18,7 +18,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 def get_casino_id_image_path(bookmaker: str) -> Optional[str]:
-    """Возвращает путь к изображению с примером ID для казино"""
+    """Возвращает путь к изображению с примером ID для букмекера"""
     if not bookmaker:
         return None
     
@@ -52,7 +52,7 @@ def get_casino_id_image_path(bookmaker: str) -> Optional[str]:
         if alt_path.exists():
             return str(alt_path)
     
-    logger.warning(f"⚠️ Не найден файл с примером ID для казино {bookmaker} в {images_dir}")
+    logger.warning(f"⚠️ Не найден файл с примером ID для букмекера {bookmaker} в {images_dir}")
     return None
 
 async def generate_qr_image(qr_url: str, bookmaker: str = '') -> Optional[BytesIO]:

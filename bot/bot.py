@@ -176,7 +176,7 @@ BANK_NAMES = {
     'odengi': 'O!Money'
 }
 
-# Маппинг названий казино
+# Маппинг названий букмекеров
 CASINO_NAMES = {
     '1xbet': '1XBET',
     '1win': '1WIN',
@@ -186,17 +186,17 @@ CASINO_NAMES = {
     '888starz': '888STARZ'
 }
 
-# Функция для получения названия казино
+# Функция для получения названия букмекера
 def get_casino_name(bookmaker: str) -> str:
-    """Получает отформатированное название казино"""
+    """Получает отформатированное название букмекера"""
     if not bookmaker:
         return ''
     bookmaker_lower = bookmaker.lower()
     return CASINO_NAMES.get(bookmaker_lower, bookmaker.upper())
 
-# Функция для получения пути к изображению ID казино
+# Функция для получения пути к изображению ID букмекера
 def get_casino_id_image_path(bookmaker: str) -> str:
-    """Возвращает путь к изображению с примером ID для казино"""
+    """Возвращает путь к изображению с примером ID для букмекера"""
     if not bookmaker:
         return None
     bookmaker_lower = bookmaker.lower()
@@ -205,7 +205,7 @@ def get_casino_id_image_path(bookmaker: str) -> str:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     images_dir = os.path.join(script_dir, '..', 'images')
     
-    # Маппинг казино на имена файлов изображений (может быть в разных форматах)
+    # Маппинг букмекеров на имена файлов изображений (может быть в разных форматах)
     image_map = {
         '1xbet': '1xbet-id.jpg',
         '1win': '1win-id.jpg',
@@ -248,11 +248,11 @@ TRANSLATIONS = {
         'faq': "📖 Инструкция",
         'deposit_title': "💰 <b>Пополнение счета</b>",
         'withdraw_title': "💸 <b>Вывод средств</b>",
-        'select_casino': "Выберите казино:",
-        'casino_label': "Казино: {casino_name}",
+        'select_casino': "Выберите букмекер:",
+        'casino_label': "Букмекер: {casino_name}",
         'bank_label': "Банк: {bank_name}",
         'phone_label': "Телефон: {phone}",
-        'enter_player_id': "Введите ваш ID игрока в казино:",
+        'enter_player_id': "Введите ваш ID игрока в букмекере:",
         'select_bank': "Выберите банк для получения средств:",
         'enter_phone': "Введите номер телефона (начинается с +996):",
         'enter_phone_format': "Введите номер телефона в формате +996XXXXXXXXX:",
@@ -260,7 +260,7 @@ TRANSLATIONS = {
         'cancel_request': "❌ Отменить заявку",
         'send_qr_code': "Отправьте фото QR-кода кошелька:",
         'qr_received': "QR-код: ✅ Загружен",
-        'enter_account_id': "Введите ваш ID игрока в казино:",
+        'enter_account_id': "Введите ваш ID игрока в букмекере:",
         'enter_withdraw_code': "Введите код для вывода:",
         'enter_withdraw_amount': "Введите сумму для вывода:",
         'min_amount': "Минимум: {min} KGS",
@@ -272,7 +272,7 @@ TRANSLATIONS = {
         'invalid_amount': "❌ Пожалуйста, введите корректную сумму.",
         'amount_too_small': "❌ Минимальная сумма: {min} KGS",
         'amount_too_large': "❌ Максимальная сумма: {max} KGS",
-        'withdrawal_request_sent': "✅ <b>Заявка на вывод создана!</b>\n\n📋 <b>Детали заявки:</b>\n🆔 <b>ID:</b> {account_id}\n📱 <b>Телефон:</b> {phone}\n💸 <b>Казино:</b> {casino_name}\n\n⏳ <b>Время обработки:</b> до 30 минут\n\n📝 <b>Важно:</b> Просто ожидайте ответа от бота. Если вы напишете оператору, это не ускорит процесс. Спасибо за понимание!",
+        'withdrawal_request_sent': "✅ <b>Заявка на вывод создана!</b>\n\n📋 <b>Детали заявки:</b>\n🆔 <b>ID:</b> {account_id}\n📱 <b>Телефон:</b> {phone}\n💸 <b>Букмекер:</b> {casino_name}\n\n⏳ <b>Время обработки:</b> до 30 минут\n\n📝 <b>Важно:</b> Просто ожидайте ответа от бота. Если вы напишете оператору, это не ускорит процесс. Спасибо за понимание!",
         'deposit_request_sent': "✅ <b>Заявка отправлена!</b>\n\n🆔 <b>ID заявки:</b> {request_id}\n💰 <b>Сумма:</b> {amount:.2f} KGS\n🆔 <b>ID {casino_name}:</b> {account_id}\n\n⏳ Ожидайте подтверждения от оператора.\n📞 Время обработки: до 30 минут",
         'processing_time': "⏳ Время обработки: до 30 минут",
         'wait_for_bot_response': "📨 Просто ожидайте ответа от бота, никуда писать не нужно.",
@@ -319,7 +319,7 @@ TRANSLATIONS = {
         'press_button_to_pay': "Нажмите кнопку ниже для оплаты:",
         'enter_correct_code': "❌ Введите код подтверждения",
         'no_photo_required': "❌ Сейчас не требуется отправка фото. Следуйте инструкциям выше.",
-        'error_processing_casino': "❌ Произошла ошибка при обработке выбора казино. Попробуйте еще раз или введите /start",
+        'error_processing_casino': "❌ Произошла ошибка при обработке выбора букмекера. Попробуйте еще раз или введите /start",
         'error_processing_bank': "❌ Произошла ошибка при обработке выбора банка. Попробуйте еще раз или введите /start",
         'please_send_receipt_after_payment': "❌ Пожалуйста, отправьте фото чека после оплаты",
         'error_creating_request': "❌ Ошибка создания заявки: {error}",
@@ -450,7 +450,7 @@ async def load_settings():
                 settings_cache['pause'] = data.get('pause', False)
                 settings_cache['maintenance_message'] = data.get('maintenance_message', 'Технические работы. Попробуйте позже.')
                 settings_cache['last_update'] = asyncio.get_event_loop().time()
-                logger.info(f"✅ Настройки загружены: казино={len(settings_cache['casinos'])}, депозиты={settings_cache['deposits_enabled']} (банки: {len(settings_cache['deposit_banks'])}), выводы={settings_cache['withdrawals_enabled']} (банки: {len(settings_cache['withdrawal_banks'])}), букмекеры={len(bookmaker_settings)}, пауза={settings_cache['pause']}")
+                logger.info(f"✅ Настройки загружены: букмекеры={len(settings_cache['casinos'])}, депозиты={settings_cache['deposits_enabled']} (банки: {len(settings_cache['deposit_banks'])}), выводы={settings_cache['withdrawals_enabled']} (банки: {len(settings_cache['withdrawal_banks'])}), букмекеры={len(bookmaker_settings)}, пауза={settings_cache['pause']}")
     except Exception as e:
         logger.warning(f"⚠️ Не удалось загрузить настройки: {e}, используем значения по умолчанию")
         # Значения по умолчанию
@@ -845,7 +845,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 'data': {}
             }
             
-            # Формируем список доступных казино через Reply клавиатуру
+            # Формируем список доступных букмекеров через Reply клавиатуру
             all_casinos = [
                 ('1xbet', '1XBET'),
                 ('1win', '1WIN'),
@@ -855,7 +855,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 ('888starz', '888STARZ')
             ]
             
-            # Фильтруем доступные казино
+            # Фильтруем доступных букмекеров
             enabled_casinos = []
             for casino_key, casino_name in all_casinos:
                 is_enabled = settings_cache.get('casinos', {}).get(casino_key, True)
@@ -896,7 +896,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 'data': {}
             }
             
-            # Формируем список доступных казино через Reply клавиатуру
+            # Формируем список доступных букмекеров через Reply клавиатуру
             all_casinos = [
                 ('1xbet', '1XBET'),
                 ('1win', '1WIN'),
@@ -906,7 +906,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 ('888starz', '888STARZ')
             ]
             
-            # Фильтруем доступные казино
+            # Фильтруем доступных букмекеров
             enabled_casinos = []
             for casino_key, casino_name in all_casinos:
                 is_enabled = settings_cache.get('casinos', {}).get(casino_key, True)
@@ -925,7 +925,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             reply_markup = ReplyKeyboardMarkup(keyboard_buttons, resize_keyboard=True, one_time_keyboard=False)
             
             await update.message.reply_text(
-                "💸 <b>Вывод средств</b>\n\nВыберите казино:",
+                "💸 <b>Вывод средств</b>\n\nВыберите букмекер:",
                 reply_markup=reply_markup,
                 parse_mode='HTML'
             )
@@ -996,10 +996,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await update.message.reply_text("❌ Сейчас не требуется отправка фото. Следуйте инструкциям выше.")
                 return
         
-        # Обработка выбора казино для пополнения
+        # Обработка выбора букмекера для пополнения
         if step == 'deposit_bookmaker':
             try:
-                # Определяем казино по тексту кнопки
+                # Определяем букмекер по тексту кнопки
                 bookmaker_map = {
                     '1XBET': '1xbet',
                     '1WIN': '1win',
@@ -1025,7 +1025,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 if not bookmaker_deposit_enabled:
                     casino_name = get_casino_name(bookmaker)
                     await update.message.reply_text(
-                        f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.",
+                        f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другого букмекера.",
                         parse_mode='HTML'
                     )
                     logger.info(f"❌ Депозиты отключены для букмекера {bookmaker}, пользователь {user_id} попытался пополнить")
@@ -1035,7 +1035,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 state['step'] = 'deposit_player_id'
                 user_states[user_id] = state
                 
-                # Получаем сохраненный ID для этого казино
+                # Получаем сохраненный ID для этого букмекера
                 saved_id = data.get('saved_player_ids', {}).get(bookmaker, '')
                 if not saved_id:
                     try:
@@ -1081,7 +1081,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 reply_markup=reply_markup
                             )
                     except Exception as e:
-                        logger.warning(f"⚠️ Не удалось отправить фото ID казино {bookmaker}: {e}")
+                        logger.warning(f"⚠️ Не удалось отправить фото ID букмекера {bookmaker}: {e}")
                         # Если не удалось отправить фото, отправляем текстовое сообщение
                         await update.message.reply_text(
                             message_text,
@@ -1089,7 +1089,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                             reply_markup=reply_markup
                         )
                 else:
-                    # Если нет изображения для этого казино, отправляем текстовое сообщение
+                    # Если нет изображения для этого букмекера, отправляем текстовое сообщение
                     await update.message.reply_text(
                         message_text,
                         parse_mode='HTML',
@@ -1097,14 +1097,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     )
                 return
             except Exception as e:
-                logger.error(f"❌ Ошибка при обработке выбора казино для пополнения: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка при обработке выбора букмекера для пополнения: {e}", exc_info=True)
                 await update.message.reply_text(get_text('error_processing_casino'))
                 return
         
-        # Обработка выбора казино для вывода
+        # Обработка выбора букмекера для вывода
         if step == 'withdraw_bookmaker':
             try:
-                # Определяем казино по тексту кнопки
+                # Определяем букмекер по тексту кнопки
                 bookmaker_map = {
                     '1XBET': '1xbet',
                     '1WIN': '1win',
@@ -1130,7 +1130,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 if not bookmaker_withdraw_enabled:
                     casino_name = get_casino_name(bookmaker)
                     await update.message.reply_text(
-                        f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.",
+                        f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другого букмекера.",
                         parse_mode='HTML'
                     )
                     logger.info(f"❌ Выводы отключены для букмекера {bookmaker}, пользователь {user_id} попытался вывести")
@@ -1140,7 +1140,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 state['step'] = 'withdraw_qr'
                 user_states[user_id] = state
                 
-                # Получаем сохраненный ID для этого казино
+                # Получаем сохраненный ID для этого букмекера
                 saved_id = data.get('saved_player_ids', {}).get(bookmaker, '')
                 if not saved_id:
                     try:
@@ -1203,7 +1203,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 return
             except Exception as e:
-                logger.error(f"❌ Ошибка при обработке выбора казино для вывода: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка при обработке выбора букмекера для вывода: {e}", exc_info=True)
                 await update.message.reply_text(get_text('error_processing_casino'))
                 return
         
@@ -1536,9 +1536,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                         # Изображение уже в RGBA режиме, пересоздаем draw для работы с текстом
                                         draw = ImageDraw.Draw(img)
                                         
-                                        # Текст "ПОПОЛНЕНИЕ ДЛЯ КАЗИНО" поверх QR-кода по диагонали в две строки
+                                        # Текст "ПОПОЛНЕНИЕ ДЛЯ БУКМЕКЕРА" поверх QR-кода по диагонали в две строки
                                         text_line1 = "ПОПОЛНЕНИЕ ДЛЯ"
-                                        text_line2 = "КАЗИНО"
+                                        text_line2 = "БУКМЕКЕРА"
                                         
                                         # Увеличиваем размер шрифта для текста поверх QR-кода (более заметный, чтобы закрывал QR-код)
                                         try:
@@ -1904,7 +1904,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     return
                 if not data.get('bookmaker'):
                     logger.error(f"❌ Отсутствует bookmaker в данных: {data}")
-                    await update.message.reply_text("❌ Ошибка: отсутствует название казино. Начните заново.")
+                    await update.message.reply_text("❌ Ошибка: отсутствует название букмекера. Начните заново.")
                     if user_id in user_states:
                         del user_states[user_id]
                     clear_pending_deposit_state(user_id)
@@ -1967,7 +1967,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         if result.get('success') != False:
                             request_id = result.get('id') or result.get('data', {}).get('id') or 'N/A'
                             
-                            # Используем переводы с динамическим названием казино
+                            # Используем переводы с динамическим названием букмекера
                             casino_name = get_casino_name(data.get('bookmaker', ''))
                             success_message = get_text(
                                 'deposit_request_sent',
@@ -2102,11 +2102,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             state['step'] = 'withdraw_player_id'
             user_states[user_id] = state
             
-            # Получаем сохраненный ID для этого казино из user_states
+            # Получаем сохраненный ID для этого букмекера из user_states
             saved_id = data.get('saved_player_ids', {}).get(data['bookmaker'], '')
-            logger.info(f"🔍 Проверка сохраненного ID для пользователя {user_id}, казино {data.get('bookmaker', '')}: saved_id = {saved_id} (type: {type(saved_id)})")
+            logger.info(f"🔍 Проверка сохраненного ID для пользователя {user_id}, букмекер {data.get('bookmaker', '')}: saved_id = {saved_id} (type: {type(saved_id)})")
             
-            # Пытаемся получить сохраненный ID из API (нормализуем название казино)
+            # Пытаемся получить сохраненный ID из API (нормализуем название букмекера)
             if not saved_id or saved_id == 'None' or saved_id == 'null' or not str(saved_id).strip():
                 try:
                     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -2114,7 +2114,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                             f"{API_URL}/api/public/casino-account",
                             params={"user_id": str(user_id), "casino_id": data['bookmaker'].lower()}
                         )
-                        logger.info(f"🔍 Запрос сохраненного ID: статус {response.status_code} для пользователя {user_id}, казино {data['bookmaker']}")
+                        logger.info(f"🔍 Запрос сохраненного ID: статус {response.status_code} для пользователя {user_id}, букмекер {data['bookmaker']}")
                         if response.status_code == 200:
                             result = response.json()
                             logger.info(f"📋 Ответ API для ID: {result}")
@@ -2134,11 +2134,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                         data['saved_player_ids'] = {}
                                     data['saved_player_ids'][data['bookmaker']] = saved_id
                                     user_states[user_id]['data'] = data
-                                    logger.info(f"✅ Получен сохраненный ID из API для пользователя {user_id}, казино {data['bookmaker']}: {saved_id}")
+                                    logger.info(f"✅ Получен сохраненный ID из API для пользователя {user_id}, букмекер {data['bookmaker']}: {saved_id}")
                                 else:
-                                    logger.info(f"ℹ️ Сохраненный ID пустой для пользователя {user_id}, казино {data['bookmaker']}")
+                                    logger.info(f"ℹ️ Сохраненный ID пустой для пользователя {user_id}, букмекер {data['bookmaker']}")
                             else:
-                                logger.info(f"ℹ️ Сохраненный ID не найден в API для пользователя {user_id}, казино {data['bookmaker']} (accountId_value: {account_id_value}, type: {type(account_id_value)})")
+                                logger.info(f"ℹ️ Сохраненный ID не найден в API для пользователя {user_id}, букмекер {data['bookmaker']} (accountId_value: {account_id_value}, type: {type(account_id_value)})")
                         else:
                             try:
                                 error_text = response.text[:200]
@@ -2183,7 +2183,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                             reply_markup=reply_markup
                         )
                 except Exception as e:
-                    logger.warning(f"⚠️ Не удалось отправить фото ID казино {data.get('bookmaker', '')}: {e}")
+                    logger.warning(f"⚠️ Не удалось отправить фото ID букмекера {data.get('bookmaker', '')}: {e}")
                     # Если не удалось отправить фото, отправляем текстовое сообщение
                     await update.message.reply_text(
                         message_text,
@@ -2191,7 +2191,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         reply_markup=reply_markup
                     )
             else:
-                # Если нет изображения для этого казино, отправляем текстовое сообщение
+                # Если нет изображения для этого букмекера, отправляем текстовое сообщение
                 await update.message.reply_text(
                     message_text,
                     parse_mode='HTML',
@@ -2234,7 +2234,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             keyboard_buttons = [[KeyboardButton("❌ Отменить заявку")]]
             reply_markup = ReplyKeyboardMarkup(keyboard_buttons, resize_keyboard=True, one_time_keyboard=False)
             
-            # Определяем адрес в зависимости от казино
+            # Определяем адрес в зависимости от букмекера
             bookmaker_lower = data['bookmaker'].lower()
             if '1xbet' in bookmaker_lower or '1x' in bookmaker_lower:
                 address_text = "tsum lux"
@@ -2579,7 +2579,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     logger.info(f"📥 Получен callback от пользователя {user_id}: {callback_data}")
     
-    # Обработка callback'ов для выбора казино и банков убрана
+    # Обработка callback'ов для выбора букмекера и банков убрана
     # Теперь выбор происходит через Reply клавиатуру в handle_message
     
     # Обработка выбора банка для вывода теперь через Reply клавиатуру (убрана callback обработка)

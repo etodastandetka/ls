@@ -179,11 +179,11 @@ function DepositStep2Content() {
     }
   }, [searchParams])
 
-  // Проверяем, нужно ли проверять ID для этого казино
+  // Проверяем, нужно ли проверять ID для этого букмекера
   const needsIdCheck = useCallback(() => {
     if (!bookmaker) return false
     const normalized = bookmaker.toLowerCase()
-    // Проверка доступна только для казино с Cashdesk API (не mostbet и не 1win)
+    // Проверка доступна только для букмекеров с Cashdesk API (не mostbet и не 1win)
     return normalized.includes('1xbet') || 
            normalized.includes('melbet') || 
            normalized.includes('winwin') || 
@@ -229,7 +229,7 @@ function DepositStep2Content() {
       
       if (data.success && data.data) {
         if (data.data.skip) {
-          // Для казино без проверки (mostbet, 1win) считаем валидным
+          // Для букмекеров без проверки (mostbet, 1win) считаем валидным
           setIdValid(true)
           return true
         } else {
@@ -350,11 +350,11 @@ function DepositStep2Content() {
 
   const handleContinue = async () => {
     if (!accountId.trim()) {
-      alert('Введите ID аккаунта в казино')
+      alert('Введите ID аккаунта в букмекере')
       return
     }
 
-    // Для казино с проверкой ID - проверяем перед продолжением
+    // Для букмекеров с проверкой ID - проверяем перед продолжением
     if (needsIdCheck()) {
       if (checkingId) {
         alert('Пожалуйста, подождите завершения проверки ID')
@@ -367,13 +367,13 @@ function DepositStep2Content() {
         
         // Проверяем результат функции (не состояние, которое обновляется асинхронно)
         if (checkResult === false) {
-          alert('Игрок с таким ID не найден в казино. Проверьте правильность введенного ID.')
+          alert('Игрок с таким ID не найден в букмекере. Проверьте правильность введенного ID.')
           return
         }
         
         // Если результат null (пропущено) или true (валидно) - продолжаем
         if (checkResult === null) {
-          // Для казино без проверки (mostbet, 1win) продолжаем
+          // Для букмекеров без проверки (mostbet, 1win) продолжаем
           // но в этом случае checkResult должен быть true, не null
         }
       }
@@ -403,7 +403,7 @@ function DepositStep2Content() {
     }
 
     if (!bookmaker) {
-      alert('Ошибка: не выбран казино')
+      alert('Ошибка: не выбран букмекер')
       return
     }
 
@@ -478,7 +478,7 @@ function DepositStep2Content() {
   const translations = {
     ru: {
       title: 'Пополнение счета',
-      accountId: 'ID аккаунта в казино',
+      accountId: 'ID аккаунта в букмекере',
       accountIdPlaceholder: 'Введите ID аккаунта',
       amount: 'Сумма (сом)',
       amountPlaceholder: 'Введите сумму',
@@ -500,7 +500,7 @@ function DepositStep2Content() {
     },
     ky: {
       title: 'Эсепти толтуруу',
-      accountId: 'Казинодогу аккаунт ID',
+      accountId: 'Букмекердин аккаунт ID',
       accountIdPlaceholder: 'ID киргизиңиз',
       amount: 'Сумма (сом)',
       amountPlaceholder: 'Сумманы киргизиңиз',
@@ -529,10 +529,10 @@ function DepositStep2Content() {
       <FixedHeaderControls />
       <h1 className="text-xl font-bold">{t.title}</h1>
       
-      {/* Информация о казино */}
+      {/* Информация о букмекере */}
       {bookmaker && (
         <section className="card space-y-2">
-          <div className="label">Казино</div>
+          <div className="label">Букмекер</div>
           <div className="text-white font-semibold text-lg">{getBookmakerName(bookmaker)}</div>
         </section>
       )}
@@ -570,7 +570,7 @@ function DepositStep2Content() {
         </div>
         {idValid === false && (
           <div className="text-red-400 text-xs">
-            Игрок с таким ID не найден в казино
+            Игрок с таким ID не найден в букмекере
           </div>
         )}
         {idValid === true && needsIdCheck() && (

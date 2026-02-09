@@ -107,7 +107,7 @@ async def start_deposit(message: Message, state: FSMContext):
             }
             await state.set_state(DepositStates.bookmaker)
             
-            # Фильтруем доступные казино
+            # Фильтруем доступные букмекеры
             enabled_casinos = []
             for casino_key, casino_name in ALL_CASINOS:
                 is_enabled = settings.get('casinos', {}).get(casino_key, True)
@@ -150,7 +150,7 @@ async def start_deposit(message: Message, state: FSMContext):
 
 @router.message(DepositStates.bookmaker)
 async def process_bookmaker(message: Message, state: FSMContext):
-    """Обработка выбора казино"""
+    """Обработка выбора букмекера"""
     user_id = message.from_user.id
     message_text = message.text or ''
     
@@ -164,7 +164,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
         await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
-    # Определяем казино по тексту кнопки
+        # Определяем букмекер по тексту кнопки
     bookmaker_map = {
         '1XBET': '1xbet',
         '1WIN': '1win',
@@ -190,7 +190,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
     
     if not bookmaker_deposit_enabled:
         casino_name = get_casino_name(bookmaker)
-        await answer_with_custom_text(message, f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.")
+        await answer_with_custom_text(message, f"❌ Пополнения для {casino_name} временно недоступны. Попробуйте позже или выберите другого букмекера.")
         return
     
     user_states[user_id]['data']['bookmaker'] = bookmaker
@@ -264,7 +264,7 @@ async def process_bookmaker(message: Message, state: FSMContext):
                 parse_mode=None
             )
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось отправить фото ID казино {bookmaker}: {e}")
+            logger.warning(f"⚠️ Не удалось отправить фото ID букмекера {bookmaker}: {e}")
             await message.answer(
                 text_with_emoji, 
                 reply_markup=reply_markup,

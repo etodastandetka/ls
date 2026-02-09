@@ -121,7 +121,7 @@ export async function usdtToUsd(usdt: number): Promise<number> {
 
 /**
  * Конвертация долларов (USD) в сомы (KGS)
- * Используется для конвертации суммы после оплаты для пополнения в казино
+ * Используется для конвертации суммы после оплаты для пополнения в букмекере
  * Всегда использует реальный курс из API
  */
 export async function usdToKgs(usd: number): Promise<number> {

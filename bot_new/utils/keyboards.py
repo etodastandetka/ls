@@ -23,7 +23,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard=reply_keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 def get_casino_keyboard(casinos: list, cancel_button: bool = True) -> ReplyKeyboardMarkup:
-    """Создает клавиатуру с казино"""
+    """Создает клавиатуру с букмекерами"""
     keyboard_buttons = []
     for i in range(0, len(casinos), 2):
         row = [KeyboardButton(text=casinos[i][1])]

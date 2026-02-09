@@ -69,7 +69,7 @@ async def start_withdraw(message: Message, state: FSMContext):
     }
     await state.set_state(WithdrawStates.bookmaker)
     
-    # Фильтруем доступные казино
+    # Фильтруем доступные букмекеры
     enabled_casinos = []
     for casino_key, casino_name in ALL_CASINOS:
         is_enabled = settings.get('casinos', {}).get(casino_key, True)
@@ -77,13 +77,13 @@ async def start_withdraw(message: Message, state: FSMContext):
             enabled_casinos.append((casino_key, casino_name))
     
     reply_markup = get_casino_keyboard(enabled_casinos)
-    withdraw_text = "💸 <b>Вывод средств</b>\n\nВыберите казино:"
+    withdraw_text = "💸 <b>Вывод средств</b>\n\nВыберите букмекер:"
     text_with_emoji, entities = add_premium_emoji_to_text(withdraw_text, Config.PREMIUM_EMOJI_MAP)
     await message.answer(text_with_emoji, reply_markup=reply_markup, entities=entities if entities else None, parse_mode=None)
 
 @router.message(WithdrawStates.bookmaker)
 async def process_withdraw_bookmaker(message: Message, state: FSMContext):
-    """Обработка выбора казино для вывода"""
+    """Обработка выбора букмекера для вывода"""
     user_id = message.from_user.id
     message_text = message.text or ''
     
@@ -97,7 +97,7 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
         await answer_with_custom_text(message, "❌ Ошибка. Начните заново с /start")
         return
     
-    # Определяем казино
+        # Определяем букмекер
     bookmaker_map = {
         '1XBET': '1xbet',
         '1WIN': '1win',
@@ -123,7 +123,7 @@ async def process_withdraw_bookmaker(message: Message, state: FSMContext):
     
     if not bookmaker_withdraw_enabled:
         casino_name = get_casino_name(bookmaker)
-        await answer_with_custom_text(message, f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другое казино.")
+        await answer_with_custom_text(message, f"❌ Выводы для {casino_name} временно недоступны. Попробуйте позже или выберите другого букмекера.")
         return
     
     user_states[user_id]['data']['bookmaker'] = bookmaker
@@ -315,7 +315,7 @@ async def process_withdraw_qr(message: Message, state: FSMContext):
                 all_entities.extend(entities)
             await message.answer_photo(photo=photo, caption=text_with_emoji, reply_markup=reply_markup, caption_entities=all_entities if all_entities else None)
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось отправить фото ID казино: {e}")
+            logger.warning(f"⚠️ Не удалось отправить фото ID букмекера: {e}")
             text_with_emoji, entities = add_premium_emoji_to_text(message_text, Config.PREMIUM_EMOJI_MAP)
             all_entities = list(title_entities) if title_entities else []
             if qr_entities:

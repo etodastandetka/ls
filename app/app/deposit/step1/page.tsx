@@ -156,7 +156,7 @@ function useBankUiTheme() {
 const translations = {
   ru: {
     title: 'Пополнение счета',
-    selectBookmaker: 'Выберите казино',
+    selectBookmaker: 'Выберите букмекер',
     next: 'Далее',
     back: 'Назад'
   },
@@ -168,7 +168,7 @@ const translations = {
   },
   ky: {
     title: 'Эсепти толтуруу',
-    selectBookmaker: 'Казинодо тандаңыз',
+    selectBookmaker: 'Букмекерди тандаңыз',
     next: 'Кийинки',
     back: 'Артка'
   },
@@ -211,7 +211,7 @@ export default function DepositStep1() {
         
         const disabled: string[] = []
         
-        // Проверяем общие настройки казино
+        // Проверяем общие настройки букмекера
         if (data && data.casinos) {
           if (data.casinos['1xbet'] === false) disabled.push('1xbet')
           if (data.casinos['1win'] === false) disabled.push('1win')
@@ -265,13 +265,13 @@ export default function DepositStep1() {
 
   const handleNext = () => {
     if (!bookmaker) {
-      alert('Выберите казино')
+      alert('Выберите букмекер')
       return
     }
     
     // Проверяем, не отключен ли выбранный букмекер
     if (disabledCasinos && disabledCasinos.includes(bookmaker)) {
-      alert('Это казино временно недоступно для пополнения. Выберите другое.')
+      alert('Этот букмекер временно недоступен для пополнения. Выберите другого.')
       return
     }
     

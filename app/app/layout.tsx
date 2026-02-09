@@ -360,7 +360,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         {/* Telegram WebApp скрипт загружается через TelegramInit компонент на клиенте */}
-        {/* Preload критических изображений казино для быстрой загрузки */}
+        {/* Preload критических изображений букмекеров для быстрой загрузки */}
         <link rel="preload" as="image" href="/images/1xbet.jpg" />
         <link rel="preload" as="image" href="/images/1win.jpg" />
         <link rel="preload" as="image" href="/images/melbet.jpg" />

@@ -28,7 +28,7 @@ export default function ReferralWithdrawStep1() {
 
   const handleContinue = () => {
     if (!selectedBookmaker) {
-      alert('Выберите казино')
+      alert('Выберите букмекер')
       return
     }
     router.push(`/referral/withdraw/step2?bookmaker=${selectedBookmaker}`)
@@ -37,7 +37,7 @@ export default function ReferralWithdrawStep1() {
   const translations = {
     ru: {
       title: 'Вывод средств из рефералки',
-      subtitle: 'Выберите казино для вывода',
+      subtitle: 'Выберите букмекер для вывода',
       continue: 'Продолжить',
       back: 'Назад'
     },
@@ -65,7 +65,7 @@ export default function ReferralWithdrawStep1() {
           <p className="text-sm text-white/70">{t.subtitle}</p>
         </div>
 
-        {/* Выбор казино */}
+        {/* Выбор букмекера */}
         <div className="space-y-3 flex-1">
           {bookmakers.map((bookmaker) => (
             <button

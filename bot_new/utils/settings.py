@@ -54,7 +54,7 @@ async def load_settings():
                 settings_cache['pause'] = data.get('pause', False)
                 settings_cache['maintenance_message'] = data.get('maintenance_message', 'Технические работы. Попробуйте позже.')
                 settings_cache['last_update'] = asyncio.get_event_loop().time()
-                logger.info(f"✅ Настройки загружены: казино={len(settings_cache['casinos'])}, депозиты={settings_cache['deposits_enabled']}")
+                logger.info(f"✅ Настройки загружены: букмекеры={len(settings_cache['casinos'])}, депозиты={settings_cache['deposits_enabled']}")
     except Exception as e:
         logger.warning(f"⚠️ Не удалось загрузить настройки: {e}, используем значения по умолчанию")
         settings_cache['casinos'] = {'1xbet': True, '1win': True, 'melbet': True, 'mostbet': True, 'winwin': True, '888starz': True}

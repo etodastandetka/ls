@@ -64,8 +64,8 @@ function BookmakerGrid({
         onChange('1xbet')
       }
     } else {
-      // Если не определен тип бота как 1xbet - показываем все казино
-      // Это основной бот со всеми казино
+      // Если не определен тип бота как 1xbet - показываем всех букмекеров
+      // Это основной бот со всеми букмекерами
       setBookmakers(ALL_BOOKMAKERS)
       // Очищаем сохраненный тип бота, чтобы не показывать только 1xbet
       localStorage.removeItem('bot_type')
@@ -76,7 +76,7 @@ function BookmakerGrid({
   }, []) // Убираем value и onChange из зависимостей чтобы избежать бесконечных циклов
 
   const handleClick = useCallback((key: string) => {
-    // Проверяем, отключено ли казино
+    // Проверяем, отключен ли букмекер
     if (disabledCasinos && disabledCasinos.includes(key)) {
       setShowModal(key)
       return
@@ -149,7 +149,7 @@ function BookmakerGrid({
         })}
       </div>
 
-      {/* Модальное окно для отключенных казино */}
+      {/* Модальное окно для отключенных букмекеров */}
       {showModal && (
         <div 
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
@@ -164,7 +164,7 @@ function BookmakerGrid({
               <h3 className="text-xl font-bold text-white">Технические работы</h3>
               <p className="text-white/70">
                 В данный момент ведутся технические работы с {getCasinoName(showModal)}. 
-                Попробуйте позже или выберите другое казино.
+                Попробуйте позже или выберите другого букмекера.
               </p>
               <button
                 onClick={() => setShowModal(null)}
