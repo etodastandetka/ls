@@ -324,26 +324,37 @@ export async function GET(request: NextRequest) {
       })(),
       // Выполняем запрос данных графика параллельно
       // ВАЖНО: Теперь считаем суммы вместо количества операций
-      prisma.$queryRaw<Array<{ 
-        date: string; 
-        deposit_sum: string | null;
-        withdrawal_sum: string | null;
-      }>>`
-        SELECT 
-          DATE(created_at)::text as date,
-          COALESCE(SUM(CASE WHEN request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved') THEN amount ELSE 0 END), 0)::text as deposit_sum,
-          COALESCE(SUM(CASE WHEN request_type = 'withdraw' AND status IN ('completed', 'approved', 'autodeposit_success', 'auto_completed') THEN amount ELSE 0 END), 0)::text as withdrawal_sum
-        FROM requests
-        WHERE created_at >= ${chartStartDate}::timestamp
-          AND created_at <= ${chartEndDate}::timestamp
-          AND (
-            (request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved'))
-            OR
-            (request_type = 'withdraw' AND status IN ('completed', 'approved', 'autodeposit_success', 'auto_completed'))
-          )
-        GROUP BY DATE(created_at)
-        ORDER BY date DESC
-      `,
+      (async () => {
+        console.log(`📊 [Limits Stats] Chart query date range: ${chartStartDate.toISOString()} to ${chartEndDate.toISOString()}`)
+        
+        const result = await prisma.$queryRaw<Array<{ 
+          date: string; 
+          deposit_sum: string | null;
+          withdrawal_sum: string | null;
+        }>>`
+          SELECT 
+            DATE(created_at)::text as date,
+            COALESCE(SUM(CASE WHEN request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved') THEN amount ELSE 0 END), 0)::text as deposit_sum,
+            COALESCE(SUM(CASE WHEN request_type = 'withdraw' AND status IN ('completed', 'approved', 'autodeposit_success', 'auto_completed') THEN amount ELSE 0 END), 0)::text as withdrawal_sum
+          FROM requests
+          WHERE created_at >= ${chartStartDate}::timestamp
+            AND created_at <= ${chartEndDate}::timestamp
+            AND (
+              (request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved'))
+              OR
+              (request_type = 'withdraw' AND status IN ('completed', 'approved', 'autodeposit_success', 'auto_completed'))
+            )
+          GROUP BY DATE(created_at)
+          ORDER BY date DESC
+        `
+        
+        console.log(`📊 [Limits Stats] Chart query returned ${result.length} rows`)
+        if (result.length > 0) {
+          console.log(`📊 [Limits Stats] Chart data sample:`, result.slice(0, 3))
+        }
+        
+        return result
+      })()
     ])
     
     // Загружаем лимиты платформ с увеличенным таймаутом (внешние API могут быть медленными)
