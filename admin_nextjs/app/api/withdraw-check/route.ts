@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
     }
 
     // КОД ВЫВОДА: не проверяем на SQL инъекции, так как код может содержать любые символы
-    // Коды вывода от казино могут содержать буквы, цифры, дефисы, подчеркивания и другие символы
+    // Коды вывода от букмекера могут содержать буквы, цифры, дефисы, подчеркивания и другие символы
     // Проверка SQL инъекций для кода вывода отключена, чтобы не блокировать валидные коды
 
     console.log(`[Withdraw Check #${requestId}] ✅ Fields validated:`, {
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent')?.substring(0, 50)
     })
 
-    // Получаем конфигурацию казино
+    // Получаем конфигурацию букмекера
     const normalizedBookmaker = bookmaker.toLowerCase()
     
     let config: any = null
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Для Cashdesk API метод Payout сразу выполняет вывод
-      // Возвращаем флаг alreadyExecuted для 1xbet, Winwin, 888starz (как у других Cashdesk казино)
+      // Возвращаем флаг alreadyExecuted для 1xbet, Winwin, 888starz (как у других Cashdesk букмекеров)
       const amount = Math.abs(checkResult.amount) // Сумма может быть отрицательной
       
       return NextResponse.json(
@@ -380,8 +380,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Отправляем запрос на вывод через API казино (без проверки в базе данных)
-    // Получаем код → отправляем запрос на вывод по API выбранного казино → если сумма получена → возвращаем для подтверждения
+    // Отправляем запрос на вывод через API букмекера (без проверки в базе данных)
+    // Получаем код → отправляем запрос на вывод по API выбранного букмекера → если сумма получена → возвращаем для подтверждения
     const result = await processWithdraw(bookmaker, playerId, code, config)
 
     if (!result.success) {
@@ -419,7 +419,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Проверяем, что amount есть и является валидным числом
-    // Если API казино вернуло сумму успешно - значит код валидный и можно переходить к подтверждению
+    // Если API букмекера вернуло сумму успешно - значит код валидный и можно переходить к подтверждению
     if (!result.amount || result.amount <= 0 || (typeof result.amount === 'number' && isNaN(result.amount))) {
       console.error(`[Withdraw Check] Amount is missing or invalid:`, {
         amount: result.amount,

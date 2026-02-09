@@ -150,20 +150,20 @@ export async function POST(request: NextRequest) {
     }
 
     // КОД ВЫВОДА: не проверяем на SQL инъекции, так как код может содержать любые символы
-    // Коды вывода от казино могут содержать буквы, цифры, дефисы, подчеркивания и другие символы
+    // Коды вывода от букмекера могут содержать буквы, цифры, дефисы, подчеркивания и другие символы
     // Проверка SQL инъекций для кода вывода отключена, чтобы не блокировать валидные коды
 
     console.log(`[Withdraw Execute] Bookmaker: ${bookmaker}, Player ID: ${playerId}, Code: ${code} (length: ${code.length}), Amount: ${amount}`)
 
-    // Отправляем запрос на вывод через API казино
-    // Если API казино возвращает успешно сумму вывода - значит код валидный и можно переходить к подтверждению
-    // Проверка дубликатов не нужна - казино само проверяет коды через свой API
+    // Отправляем запрос на вывод через API букмекера
+    // Если API букмекера возвращает успешно сумму вывода - значит код валидный и можно переходить к подтверждению
+    // Проверка дубликатов не нужна - букмекер сам проверяет коды через свой API
 
     const normalizedBookmaker = bookmaker.toLowerCase()
 
     // 1xbet, Melbet, Winwin, 888starz используют Cashdesk API
     // Для Cashdesk API метод Payout уже выполнил вывод на этапе check
-    // Этот endpoint используется только для других казино, которые требуют отдельного выполнения
+    // Этот endpoint используется только для других букмекеров, которые требуют отдельного выполнения
     if (normalizedBookmaker.includes('1xbet') || normalizedBookmaker === '1xbet' ||
         normalizedBookmaker.includes('melbet') || normalizedBookmaker === 'melbet' ||
         normalizedBookmaker.includes('winwin') || normalizedBookmaker === 'winwin' ||
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Для других казино (Mostbet, 1win и т.д.) может потребоваться отдельное выполнение
+    // Для других букмекеров (Mostbet, 1win и т.д.) может потребоваться отдельное выполнение
     const config = await getCasinoConfig(bookmaker)
     
     if (!config) {

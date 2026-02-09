@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         : { enabled: true, banks: ['kompanion', 'odengi', 'bakai', 'balance', 'megapay', 'mbank'] }
     }
 
-    // Получаем настройки казино
+    // Получаем настройки букмекера
     const casinoSettings = settingsMap.casinos || {
       '1xbet': true,
       '1win': true,

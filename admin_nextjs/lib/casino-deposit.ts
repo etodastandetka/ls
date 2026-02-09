@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { MobCashClient } from './mob-cash-api'
 
-// Конфигурация API казино
+// Конфигурация API букмекера
 interface CasinoConfig {
   hash?: string
   cashierpass?: string
@@ -112,7 +112,7 @@ export async function depositCashdeskAPI(
   }
 
   try {
-    // userId здесь - это ID казино (accountId), не Telegram ID
+    // userId здесь - это ID букмекера (accountId), не Telegram ID
     console.log(`[Cashdesk Deposit] Bookmaker: ${bookmaker}, Casino User ID: ${userId}, Amount: ${amount}`)
     
     // Для Melbet и Winwin userId должен быть в нижнем регистре для API URL и confirm
@@ -301,7 +301,7 @@ export async function depositMostbetAPI(
   }
 
   try {
-    // userId здесь - это ID казино (accountId), не Telegram ID
+    // userId здесь - это ID букмекера (accountId), не Telegram ID
     console.log(`[Mostbet Deposit] Casino Player ID: ${userId}, Amount: ${amount}`)
     
     // Получаем timestamp в формате YYYY-MM-DD HH:MM:SS в UTC+0 (как требует документация)
@@ -319,7 +319,7 @@ export async function depositMostbetAPI(
     const path = `/mbc/gateway/v1/api/cashpoint/${cashpointIdStr}/player/deposit`
     const requestBodyData = {
       brandId: config.brand_id || 1, // По умолчанию Mostbet
-      playerId: String(userId), // ID игрока в казино
+      playerId: String(userId), // ID игрока в букмекере
       amount: amount,
       currency: 'KGS', // KGS для Киргизии
     }
@@ -419,7 +419,7 @@ export async function depositMobCashAPI(
   }
 
   try {
-    // payerID здесь - это ID игрока в казино (accountId), не Telegram ID
+    // payerID здесь - это ID игрока в букмекере (accountId), не Telegram ID
     console.log(`[MobCash Deposit] Payer ID: ${payerID}, Amount: ${amount}`)
 
     // Создаем клиент mob-cash

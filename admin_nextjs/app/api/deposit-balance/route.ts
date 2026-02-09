@@ -79,11 +79,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ВАЖНО: Используем accountId (ID казино), а не userId (Telegram ID)
-    // accountId - это ID игрока в казино (например, ID счета 1xbet, Melbet и т.д.)
+    // ВАЖНО: Используем accountId (ID букмекера), а не userId (Telegram ID)
+    // accountId - это ID игрока в букмекере (например, ID счета 1xbet, Melbet и т.д.)
     console.log(`[Deposit Balance] Bookmaker: ${bookmaker}, Casino Account ID: ${accountId}, Amount: ${amount}, Request ID: ${requestId}`)
     
-    // Пополняем баланс через API казино
+    // Пополняем баланс через API букмекера
     const depositResult = await depositToCasino(bookmaker, accountId, parseFloat(amount), parseInt(requestId))
 
     if (!depositResult.success) {
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       const closedDuration = formatDuration(requestData.createdAt, updatedRequest.processedAt || new Date())
       const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
         `💰 Сумма: ${amount} сом\n` +
-        `🎰 Казино: ${bookmaker.toUpperCase()}` +
+        `🎰 Букмекер: ${bookmaker.toUpperCase()}` +
         (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
       
       // Отправляем уведомление асинхронно, не блокируя ответ

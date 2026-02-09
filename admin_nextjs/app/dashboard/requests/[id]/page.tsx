@@ -573,7 +573,7 @@ export default function RequestDetailPage() {
     }
   }, [showMenu])
 
-  // Получаем все транзакции по accountId (ID казино) - используем useMemo для безопасного вычисления
+  // Получаем все транзакции по accountId (ID букмекера) - используем useMemo для безопасного вычисления
   // ВАЖНО: должен вызываться до любых условных возвратов!
   const transactions = useMemo(() => {
     if (!request || !request.casinoTransactions) return []
@@ -934,7 +934,7 @@ export default function RequestDetailPage() {
           }
         }
         
-        // Если подтверждаем депозит, пополняем баланс через API казино
+        // Если подтверждаем депозит, пополняем баланс через API букмекера
         if ((newStatus === 'completed' || newStatus === 'approved') && request.requestType === 'deposit' && request.bookmaker && request.accountId && request.amount) {
           try {
             // Если выбран платеж, используем его сумму, иначе сумму заявки
@@ -1930,7 +1930,7 @@ export default function RequestDetailPage() {
         </div>
       </div>
 
-      {/* Список транзакций по ID казино */}
+      {/* Список транзакций по ID букмекера */}
       <div className="mx-4">
         <h3 className="text-lg font-semibold text-white mb-3">
           Транзакции {request.accountId && `(ID: ${request.accountId})`}
@@ -1951,7 +1951,7 @@ export default function RequestDetailPage() {
             <p className="text-gray-400">
               {request.accountId 
                 ? `Нет транзакций по ID: ${request.accountId}`
-                : 'ID казино не указан'}
+                : 'ID букмекера не указан'}
             </p>
           </div>
         )}

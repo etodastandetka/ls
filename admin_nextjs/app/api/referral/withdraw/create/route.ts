@@ -159,13 +159,13 @@ export async function POST(request: NextRequest) {
         currency: 'KGS',
         bookmaker: bookmaker.toLowerCase(),
         bookmakerAccountId: accountId,
-        paymentMethod: 'casino_deposit', // Пополнение в казино
+        paymentMethod: 'casino_deposit', // Пополнение в букмекере
         walletDetails: `Account ID: ${accountId}`,
         status: 'pending'
       }
     })
     
-    // АВТОМАТИЧЕСКИЙ ВЫВОД - сразу пополняем баланс в казино
+    // АВТОМАТИЧЕСКИЙ ВЫВОД - сразу пополняем баланс в букмекере
     const { depositToCasino } = await import('../../../../../lib/deposit-balance')
     
     try {
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       const groupMessage = `✅ <b>Реферальный вывод (автоматический)</b>\n\n` +
         `👤 Пользователь: ${usernameStr}\n` +
         `💰 Сумма: ${amountStr} ${updatedRequest.currency}\n` +
-        `🎰 Казино: ${updatedRequest.bookmaker}\n` +
+        `🎰 Букмекер: ${updatedRequest.bookmaker}\n` +
         `🆔 ID аккаунта: ${updatedRequest.bookmakerAccountId}\n` +
         `📋 ID заявки: #${updatedRequest.id}\n\n` +
         `Статус: автоматически пополнен ✅`
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
       const errorMessage = `❌ <b>Ошибка реферального вывода</b>\n\n` +
         `👤 Пользователь: ${usernameStr}\n` +
         `💰 Сумма: ${amountStr} ${withdrawalRequest.currency}\n` +
-        `🎰 Казино: ${withdrawalRequest.bookmaker}\n` +
+        `🎰 Букмекер: ${withdrawalRequest.bookmaker}\n` +
         `📋 ID заявки: #${withdrawalRequest.id}\n` +
         `⚠️ Ошибка: ${casinoError.message || 'Неизвестная ошибка'}`
       

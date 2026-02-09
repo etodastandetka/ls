@@ -177,10 +177,10 @@ export async function POST(request: NextRequest) {
 
     // Определяем user_id (Telegram ID пользователя - обязателен для правильной идентификации)
     // Приоритет: telegram_user_id > userId > user_id
-    // НЕ используем playerId как userId, т.к. это ID аккаунта в казино, а не Telegram ID
+    // НЕ используем playerId как userId, т.к. это ID аккаунта в букмекере, а не Telegram ID
     let finalUserId = telegram_user_id || userId || user_id
     
-    // accountId - это ID аккаунта в казино (может быть одинаковым для разных пользователей)
+    // accountId - это ID аккаунта в букмекере (может быть одинаковым для разных пользователей)
     // Приоритет: account_id > playerId (но НЕ userId/user_id, т.к. это Telegram ID)
     const finalAccountId = account_id || playerId
 
@@ -411,7 +411,7 @@ export async function POST(request: NextRequest) {
       return errorResponse
     }
 
-    // Валидация минимального депозита в зависимости от казино
+    // Валидация минимального депозита в зависимости от букмекера
     let finalAmount = amount ? parseFloat(amount) : null
     if (type === 'deposit' && finalAmount) {
       if (!isNaN(finalAmount)) {
@@ -429,7 +429,7 @@ export async function POST(request: NextRequest) {
         
         if (finalAmount < minDeposit) {
           const errorResponse = NextResponse.json(
-            createApiResponse(null, `Минимальная сумма депозита для ${bookmaker || 'этого казино'}: ${minDeposit} сом`),
+            createApiResponse(null, `Минимальная сумма депозита для ${bookmaker || 'этого букмекера'}: ${minDeposit} сом`),
             { 
               status: 400,
               headers: {
@@ -735,7 +735,7 @@ export async function POST(request: NextRequest) {
         lastName: finalLastName,
         bookmaker,
         accountId: finalAccountId?.toString(),
-        amount: finalAmount, // В сомах (для пополнения в казино), null для error_log (может быть скорректировано для депозитов)
+        amount: finalAmount, // В сомах (для пополнения в букмекере), null для error_log (может быть скорректировано для депозитов)
         requestType: type,
         bank: finalBank,
         phone,
@@ -857,7 +857,7 @@ export async function POST(request: NextRequest) {
       const groupMessage = `🔴 <b>Новая заявка на вывод</b>\n\n` +
         `👤 Пользователь: ${usernameStr}\n` +
         `💰 Сумма: ${amountStr} сом\n` +
-        `🎰 Казино: ${bookmakerStr}\n` +
+        `🎰 Букмекер: ${bookmakerStr}\n` +
         `🆔 ID аккаунта: ${accountIdStr}\n` +
         `📋 ID заявки: #${newRequest.id}\n\n` +
         `Статус: ожидает обработки`

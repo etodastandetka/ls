@@ -2,7 +2,7 @@ import { prisma } from './prisma'
 import { depositCashdeskAPI, depositMostbetAPI, depositMobCashAPI } from './casino-deposit'
 import { getMobCashConfigFromTokens } from './mobcash-tokens'
 
-// Функция для получения конфигурации API казино из настроек
+// Функция для получения конфигурации API букмекера из настроек
 export async function getCasinoConfig(bookmaker: string) {
   const normalizedBookmaker = bookmaker?.toLowerCase() || ''
   
@@ -263,7 +263,7 @@ export async function getMobCashConfig(bookmaker: string): Promise<{
   return null
 }
 
-// Функция для пополнения баланса через API казино
+// Функция для пополнения баланса через API букмекера
 export async function depositToCasino(
   bookmaker: string,
   accountId: string,

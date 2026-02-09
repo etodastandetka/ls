@@ -1,11 +1,11 @@
 /**
- * Функции для работы с API вывода средств из казино
+ * Функции для работы с API вывода средств из букмекера
  * Поддерживаются: 1xbet, Melbet, Mostbet, 1win
  */
 import crypto from 'crypto'
 import { MobCashClient } from './mob-cash-api'
 
-// Конфигурация API казино
+// Конфигурация API букмекера
 interface CasinoConfig {
   hash?: string
   cashierpass?: string
@@ -480,7 +480,7 @@ export async function checkWithdrawAmountMostbet(
       console.log(`[Mostbet Withdraw Check] No withdrawals found for player ${playerId}`)
       return {
         success: false,
-        message: 'У этого игрока нет активных запросов на вывод. Убедитесь, что вы создали заявку на вывод в казино Mostbet.',
+        message: 'У этого игрока нет активных запросов на вывод. Убедитесь, что вы создали заявку на вывод в букмекере Mostbet.',
       }
     }
 
@@ -573,7 +573,7 @@ export async function checkWithdrawAmountMostbet(
         'NEW_ERROR': 'Ошибка при создании транзакции вывода',
         'PROCESSING_ERROR': 'Ошибка при обработке транзакции',
         'CANCELED': 'Транзакция была отменена',
-        'EXPIRED': 'Код подтверждения просрочен. Создайте новую заявку на вывод в казино.',
+          'EXPIRED': 'Код подтверждения просрочен. Создайте новую заявку на вывод в букмекере.',
       }
       const message = confirmData.message || statusMessages[confirmData.status] || 'Неверный код или транзакция недоступна'
       return {
@@ -859,7 +859,7 @@ export async function processWithdrawMobCash(
 }
 
 /**
- * Выполнение вывода средств через API казино
+ * Выполнение вывода средств через API букмекера
  */
 export async function processWithdraw(
   bookmaker: string,

@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     const normalizedBookmaker = bookmaker.toLowerCase()
 
-    // Проверка доступна только для казино с Cashdesk API
+    // Проверка доступна только для букмекеров с Cashdesk API
     // mostbet и 1win не поддерживают проверку
     const supportedCasinos = ['1xbet', 'melbet', 'winwin', '888starz']
     
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       return response
     }
 
-    // Получаем конфигурацию казино
+    // Получаем конфигурацию букмекера
     const config = await getCasinoConfig(bookmaker)
     
     if (!config || !config.hash || !config.cashierpass || !config.login || !config.cashdeskid) {
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       return response
     }
 
-    // Определяем тип казино для вызова функции
+    // Определяем тип букмекера для вызова функции
     let casinoType: '1xbet' | 'melbet' | 'winwin' | '888starz'
     if (normalizedBookmaker.includes('1xbet') || normalizedBookmaker === '1xbet') {
       casinoType = '1xbet'

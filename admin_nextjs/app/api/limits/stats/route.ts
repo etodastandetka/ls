@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
       chartEndDate = new Date() // Текущее время
     }
     
-    // Получаем настройки казино, статистику по платформам и данные графика параллельно
+    // Получаем настройки букмекера, статистику по платформам и данные графика параллельно
     // Лимиты платформ загружаем отдельно с таймаутом, чтобы не блокировать основной ответ
     const [casinoSettingsConfig, platformStatsQuery, chartData] = await Promise.all([
       prisma.botConfiguration.findFirst({
@@ -364,7 +364,7 @@ export async function GET(request: NextRequest) {
     let platformLimits: any[] = []
     try {
       const { getPlatformLimits } = await import('../../../../lib/casino-api')
-      // Увеличиваем таймаут до 10 секунд для запросов к внешним API казино
+      // Увеличиваем таймаут до 10 секунд для запросов к внешним API букмекера
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('Timeout')), 10000)
       )

@@ -929,11 +929,11 @@ export class MobCashClient {
         
         // Обработка специфичных ошибок MobCash
         if (errorMessage.includes('order not found') || errorMessage.includes('withdraw order')) {
-          errorMessage = `Ордер на вывод не найден. Убедитесь, что вы создали ордер на вывод в казино и ввели правильный код.`
+          errorMessage = `Ордер на вывод не найден. Убедитесь, что вы создали ордер на вывод в букмекере и ввели правильный код.`
         } else if (errorMessage.includes('invalid code') || errorMessage.includes('code')) {
           errorMessage = `Неверный код. Проверьте правильность кода ордера на вывод.`
         } else if (errorMessage.includes('payerID') || errorMessage.includes('payer')) {
-          errorMessage = `Неверный ID аккаунта. Проверьте правильность ID аккаунта в казино.`
+          errorMessage = `Неверный ID аккаунта. Проверьте правильность ID аккаунта в букмекере.`
         }
         
         // Извлекаем дополнительную информацию из error.data
@@ -969,7 +969,7 @@ export class MobCashClient {
           const payerIdMatch = fullErrorMessage.match(/payerID\s+(\d+)/i)
           const payerIdInfo = payerIdMatch ? ` для аккаунта ${payerIdMatch[1]}` : ''
           
-          errorMessage = `Ордер на вывод не найден${payerIdInfo}. Убедитесь, что:\n1. Вы создали ордер на вывод в казино\n2. Ввели правильный код ордера\n3. ID аккаунта указан верно`
+          errorMessage = `Ордер на вывод не найден${payerIdInfo}. Убедитесь, что:\n1. Вы создали ордер на вывод в букмекере\n2. Ввели правильный код ордера\n3. ID аккаунта указан верно`
         } else if (causeMessage) {
           // Если есть дополнительная информация, добавляем её
           errorMessage = `${errorMessage}. ${causeMessage}`

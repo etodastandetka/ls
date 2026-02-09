@@ -27,7 +27,7 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const casinoId = searchParams.get('casino_id')
     
-    // Если запрашивается account_id для конкретного казино
+    // Если запрашивается account_id для конкретного букмекера
     if (casinoId) {
       const dataType = `casino_account_id_${casinoId.toLowerCase()}`
       const userData = await prisma.botUserData.findUnique({
@@ -144,7 +144,7 @@ export async function GET(
   }
 }
 
-// Сохранение account_id для казино
+// Сохранение account_id для букмекера
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> | { userId: string } }

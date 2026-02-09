@@ -113,7 +113,7 @@ export async function POST(
         } as any,
       })
 
-      // Если это депозит, пополняем баланс через казино API
+      // Если это депозит, пополняем баланс через букмекер API
       if (linkedRequest.requestType === 'deposit' && linkedRequest.bookmaker && linkedRequest.accountId) {
         try {
           const { depositToCasino } = await import('../../../../../lib/deposit-balance')

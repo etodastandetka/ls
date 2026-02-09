@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       banks: ['kompanion', 'odengi', 'bakai', 'balance', 'megapay', 'mbank']
     }
 
-    // Получаем настройки казино
+    // Получаем настройки букмекера
     const casinoSettings = settingsMap.casinos || {
       '1xbet': true,
       '1win': true,
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.casinos !== undefined) {
-      await updateSetting('casinos', body.casinos, 'Настройки казино')
+      await updateSetting('casinos', body.casinos, 'Настройки букмекера')
     }
 
     if (body.channel_subscription_enabled !== undefined || body.channel_username !== undefined || body.channel_id !== undefined) {

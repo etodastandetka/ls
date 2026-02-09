@@ -9,7 +9,7 @@ import {
   getClientIP 
 } from '@/lib/security'
 
-// Публичный эндпоинт для сохранения и получения account_id казино (для бота)
+// Публичный эндпоинт для сохранения и получения account_id букмекера (для бота)
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -21,7 +21,7 @@ export async function OPTIONS() {
   })
 }
 
-// Получение сохраненного account_id для казино
+// Получение сохраненного account_id для букмекера
 export async function GET(request: NextRequest) {
   try {
     // 🛡️ МАКСИМАЛЬНАЯ ЗАЩИТА
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Сохранение account_id для казино
+// Сохранение account_id для букмекера
 export async function POST(request: NextRequest) {
   try {
     // 🛡️ МАКСИМАЛЬНАЯ ЗАЩИТА
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     // Проверка формата account_id (должен быть числом, но для телефона разрешаем формат +996XXXXXXXXX)
     if (casino_id.toLowerCase() !== 'phone') {
-      // Для казино account_id должен быть числом
+      // Для букмекера account_id должен быть числом
       if (!/^\d+$/.test(account_id)) {
         return NextResponse.json(
           createApiResponse(null, 'Invalid account_id format (must be numeric)'),

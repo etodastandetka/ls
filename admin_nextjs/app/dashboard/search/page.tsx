@@ -302,7 +302,7 @@ export default function SearchPage() {
                                 <div>
                                   Сумма: <span className="text-white font-medium">{request.amount?.toFixed(2) || '-'} сом</span>
                                 </div>
-                                <div>Казино: {request.bookmaker || '-'}</div>
+                                <div>Букмекер: {request.bookmaker || '-'}</div>
                                 {request.bank && <div>Банк: {request.bank}</div>}
                                 <div>ID счета: {request.accountId || '-'}</div>
                                 {request.userId && <div>ID пользователя: {request.userId}</div>}

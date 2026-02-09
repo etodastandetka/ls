@@ -56,7 +56,7 @@ export async function GET(
         new Promise(resolve => setTimeout(() => resolve([]), 200))
       ]) as Promise<any[]> : Promise.resolve([]),
       
-      // Транзакции казино (с таймаутом 200ms - уменьшен для скорости)
+      // Транзакции букмекера (с таймаутом 200ms - уменьшен для скорости)
       requestData.accountId && requestData.bookmaker ? Promise.race([
         prisma.request.findMany({
           where: {

@@ -300,11 +300,11 @@ export async function PATCH(
     if (body.photoFileUrl !== undefined) {
       updateData.photoFileUrl = body.photoFileUrl
     }
-    // Обновление ID казино
+    // Обновление ID букмекера
     if (body.accountId !== undefined) {
       updateData.accountId = body.accountId
     }
-    // Обновление казино
+    // Обновление букмекера
     if (body.bookmaker !== undefined) {
       updateData.bookmaker = body.bookmaker
     }
@@ -371,18 +371,18 @@ export async function PATCH(
           if (requestBeforeUpdate.requestType === 'deposit') {
             notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
               `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-              `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+              `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
               (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           } else if (requestBeforeUpdate.requestType === 'withdraw') {
             notificationMessage = `✅ <b>Заявка на вывод одобрена!</b>\n\n` +
               `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-              `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+              `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
               (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           }
         } else if (body.status === 'rejected') {
           notificationMessage = `❌ <b>Заявка отклонена</b>\n\n` +
             `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-            `🎰 Казино: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+            `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
             (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
           
           if (body.statusDetail) {

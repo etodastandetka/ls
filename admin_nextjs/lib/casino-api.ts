@@ -118,7 +118,7 @@ async function getCashdeskBalance(
 
     const url = `https://partners.servcul.com/CashdeskBotAPI/Cashdesk/${cfg.cashdeskid}/Balance?confirm=${confirm}&dt=${encodeURIComponent(formattedDt)}`
     
-    // Добавляем Basic Auth для всех казино (включая 888starz)
+    // Добавляем Basic Auth для всех букмекеров (включая 888starz)
     const authString = `${cfg.login}:${cfg.cashierpass}`
     const authBase64 = Buffer.from(authString).toString('base64')
     const authHeader = `Basic ${authBase64}`
@@ -136,10 +136,10 @@ async function getCashdeskBalance(
     
     // Заголовки для запроса
     // Согласно документации: "ensure that the request headers include the generated signature sign"
-    // Authorization нужен для всех казино (включая 888starz)
+    // Authorization нужен для всех букмекеров (включая 888starz)
     const headers: Record<string, string> = {
-      'sign': sign, // Заголовок sign (с маленькой буквы) для всех казино
-      'Authorization': authHeader, // Basic Auth нужен для всех казино
+      'sign': sign, // Заголовок sign (с маленькой буквы) для всех букмекеров
+      'Authorization': authHeader, // Basic Auth нужен для всех букмекеров
     }
 
     const logDetails: any = {
@@ -695,7 +695,7 @@ interface PlayerCheckResult {
 
 /**
  * Проверка существования игрока через Cashdesk API (метод "Поиск игрока")
- * Поддерживается только для казино с Cashdesk API: 1xbet, melbet, winwin, 888starz
+ * Поддерживается только для букмекеров с Cashdesk API: 1xbet, melbet, winwin, 888starz
  * Для mostbet и 1win проверка недоступна
  */
 export async function checkPlayerExists(

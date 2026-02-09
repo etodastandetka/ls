@@ -82,7 +82,7 @@ export async function POST(
       }, { status: 400 })
     }
     
-    // Пополняем баланс в казино
+    // Пополняем баланс в букмекере
     const { depositToCasino } = await import('../../../../../../lib/deposit-balance')
     
     try {
@@ -103,7 +103,7 @@ export async function POST(
         }
       })
       
-      console.log(`✅ [Referral Withdraw Approve] Заявка #${requestId} подтверждена. Сумма ${requestAmount.toFixed(2)} сом списана с баланса и пополнена в казино.`)
+      console.log(`✅ [Referral Withdraw Approve] Заявка #${requestId} подтверждена. Сумма ${requestAmount.toFixed(2)} сом списана с баланса и пополнена в букмекере.`)
       
       // Отправляем уведомление в группу о завершении вывода
       const amountStr = parseFloat(updatedRequest.amount.toString()).toFixed(2)
@@ -112,7 +112,7 @@ export async function POST(
       const groupMessage = `✅ <b>Реферальный вывод обработан</b>\n\n` +
         `👤 Пользователь: ${usernameStr}\n` +
         `💰 Сумма: ${amountStr} ${updatedRequest.currency}\n` +
-        `🎰 Казино: ${updatedRequest.bookmaker}\n` +
+        `🎰 Букмекер: ${updatedRequest.bookmaker}\n` +
         `📋 ID заявки: #${requestId}\n\n` +
         `Статус: успешно пополнен`
       

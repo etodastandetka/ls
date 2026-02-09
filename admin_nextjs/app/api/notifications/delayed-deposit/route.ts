@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       const groupMessage = `🟢 <b>Новая заявка на пополнение</b>\n\n` +
         `👤 Пользователь: ${usernameStr}\n` +
         `💰 Сумма: ${amountStr} сом\n` +
-        `🎰 Казино: ${bookmakerStr}\n` +
+        `🎰 Букмекер: ${bookmakerStr}\n` +
         `🆔 ID аккаунта: ${accountIdStr}\n` +
         `📋 ID заявки: #${request.id}\n\n` +
         `Статус: ожидает обработки`

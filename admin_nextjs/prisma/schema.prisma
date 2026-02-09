@@ -99,7 +99,7 @@ model Request {
   @@index([status])
   @@index([requestType])
   @@index([createdAt])
-  @@index([accountId, bookmaker]) // Для поиска транзакций казино по accountId + bookmaker
+  @@index([accountId, bookmaker]) // Для поиска транзакций букмекера по accountId + bookmaker
   @@index([accountId]) // Для поиска по accountId
   @@index([processedBy]) // Для фильтрации ручных заявок
   @@index([amount]) // Для поиска matching payments

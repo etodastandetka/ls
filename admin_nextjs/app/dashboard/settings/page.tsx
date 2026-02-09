@@ -328,9 +328,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Настройки казино */}
+      {/* Настройки букмекера */}
       <div className="bg-gray-800 bg-opacity-50 rounded-xl p-4 mb-4 border border-gray-700 backdrop-blur-sm">
-        <h2 className="text-base font-bold text-white mb-4">Настройки казино</h2>
+        <h2 className="text-base font-bold text-white mb-4">Настройки букмекера</h2>
         
         <div className="space-y-3">
           {(['1xbet', '1win', 'melbet', 'mostbet', 'winwin'] as const).map((casino) => (

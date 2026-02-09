@@ -65,3 +65,4 @@ console.log('  Совпадают?', field59Correct[2] === field59Mine[2])
 
 
 
+
