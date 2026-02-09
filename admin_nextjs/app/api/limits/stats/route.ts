@@ -327,11 +327,12 @@ export async function GET(request: NextRequest) {
       (async () => {
         console.log(`📊 [Limits Stats] Chart query date range: ${chartStartDate.toISOString()} to ${chartEndDate.toISOString()}`)
         
+        // Используем Prisma.sql для безопасной передачи Date параметров
         const result = await prisma.$queryRaw<Array<{ 
           date: string; 
           deposit_sum: string | null;
           withdrawal_sum: string | null;
-        }>>`
+        }>>(Prisma.sql`
           SELECT 
             DATE(created_at)::text as date,
             COALESCE(SUM(CASE WHEN request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved') THEN amount ELSE 0 END), 0)::text as deposit_sum,
@@ -346,11 +347,13 @@ export async function GET(request: NextRequest) {
             )
           GROUP BY DATE(created_at)
           ORDER BY date DESC
-        `
+        `)
         
         console.log(`📊 [Limits Stats] Chart query returned ${result.length} rows`)
         if (result.length > 0) {
           console.log(`📊 [Limits Stats] Chart data sample:`, result.slice(0, 3))
+        } else {
+          console.warn(`⚠️ [Limits Stats] Chart query returned 0 rows for date range ${chartStartDate.toISOString()} to ${chartEndDate.toISOString()}`)
         }
         
         return result
@@ -473,6 +476,14 @@ export async function GET(request: NextRequest) {
 
     const synchronizedDeposits = allLabels.map((label: string) => depositsDict[label] || 0)
     const synchronizedWithdrawals = allLabels.map((label: string) => withdrawalsDict[label] || 0)
+    
+    // Логируем финальные данные графика перед отправкой
+    console.log(`📊 [Limits Stats] Final chart data:`)
+    console.log(`  Labels: ${allLabels.length}`, allLabels)
+    console.log(`  Deposits:`, synchronizedDeposits)
+    console.log(`  Withdrawals:`, synchronizedWithdrawals)
+    console.log(`  Total deposits sum: ${synchronizedDeposits.reduce((a, b) => a + b, 0)}`)
+    console.log(`  Total withdrawals sum: ${synchronizedWithdrawals.reduce((a, b) => a + b, 0)}`)
     
     // Преобразуем результаты в нужный формат
     const platformStatsMap = new Map<string, PlatformStats>()
