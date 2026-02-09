@@ -889,8 +889,8 @@ export default function RequestDetailPage() {
         return
       }
       
-      // Проверяем, что заявка еще не обработана
-      if (request.status === 'completed' || request.status === 'approved' || request.status === 'api_error') {
+      // Проверяем, что заявка еще не обработана (но разрешаем обработку api_error для повторной попытки)
+      if (request.status === 'completed' || request.status === 'approved') {
         alert(`Заявка уже обработана (статус: ${request.status}). Пожалуйста, обновите страницу.`)
         return
       }
@@ -1732,9 +1732,9 @@ export default function RequestDetailPage() {
               setPendingStatus('approved')
               setShowConfirmModal(true)
             }}
-            disabled={isProcessing || request.status === 'completed' || request.status === 'approved' || request.status === 'api_error'}
+            disabled={isProcessing || request.status === 'completed' || request.status === 'approved'}
             className={`flex-1 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center space-x-2 ${
-              isProcessing || request.status === 'completed' || request.status === 'approved' || request.status === 'api_error'
+              isProcessing || request.status === 'completed' || request.status === 'approved'
                 ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                 : 'bg-green-500 hover:bg-green-600 text-black'
             }`}

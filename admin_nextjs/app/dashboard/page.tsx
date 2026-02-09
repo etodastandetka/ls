@@ -61,8 +61,9 @@ export default function DashboardPage() {
     try {
       const params = new URLSearchParams()
       if (activeTab === 'pending') {
-        // Показываем только ожидающие заявки
-        params.append('status', 'pending')
+        // Показываем ожидающие заявки и заявки с ошибкой API (чтобы можно было обработать вручную)
+        // Используем специальный параметр для множественного статуса
+        params.append('status', 'pending,api_error,deposit_failed')
       } else if (activeTab === 'deferred') {
         // Показываем только отложенные заявки
         params.append('status', 'deferred')

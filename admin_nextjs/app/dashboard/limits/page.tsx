@@ -166,11 +166,20 @@ export default function LimitsPage() {
     }
   }
 
+  // Функция для форматирования даты в YYYY-MM-DD с учетом локального часового пояса
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const handleApplyPeriod = () => {
     if (selectedDates.length >= 1) {
-      const start = selectedDates[0].toISOString().split('T')[0]
+      // Используем локальное форматирование вместо toISOString() чтобы избежать проблем с часовыми поясами
+      const start = formatDateLocal(selectedDates[0])
       const end = selectedDates.length === 2 
-        ? selectedDates[1].toISOString().split('T')[0]
+        ? formatDateLocal(selectedDates[1])
         : start // Если выбрана одна дата, используем её как начало и конец
       
       const params = new URLSearchParams()

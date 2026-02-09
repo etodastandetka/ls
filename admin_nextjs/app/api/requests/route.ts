@@ -18,7 +18,13 @@ export async function GET(request: NextRequest) {
     if (type) where.requestType = type
     if (status && status !== 'left') {
       // Статус 'left' не существует в БД, это специальный фильтр для UI
-      where.status = status
+      // Поддерживаем множественные статусы через запятую (например: "pending,api_error,deposit_failed")
+      if (status.includes(',')) {
+        const statuses = status.split(',').map(s => s.trim()).filter(s => s)
+        where.status = { in: statuses }
+      } else {
+        where.status = status
+      }
     } else if (status === 'left') {
       // Для "Оставленные" фильтруем все кроме pending
       where.status = { not: 'pending' }
