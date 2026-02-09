@@ -378,7 +378,10 @@ export default function LimitsPage() {
               boxPadding: 8,
               callbacks: {
                 label: function(context: any) {
-                  return `${context.dataset.label}: ${context.parsed.y} операций`
+                  const value = context.parsed.y
+                  // Форматируем сумму с 2 знаками после запятой
+                  const formattedValue = value.toFixed(2).replace('.', ',')
+                  return `${context.dataset.label}: ${formattedValue} с`
                 }
               }
             },
@@ -411,9 +414,13 @@ export default function LimitsPage() {
                   size: 11,
                 },
                 padding: 10,
-                stepSize: 1,
                 callback: function(value: any) {
-                  return Number(value).toFixed(0)
+                  // Форматируем сумму для оси Y
+                  const numValue = Number(value)
+                  if (numValue >= 1000) {
+                    return (numValue / 1000).toFixed(1) + 'k'
+                  }
+                  return numValue.toFixed(0)
                 },
               },
               grid: {

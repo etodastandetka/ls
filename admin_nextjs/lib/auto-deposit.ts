@@ -58,10 +58,11 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
 
   // Оптимизированный поиск заявок - минимум запросов для максимальной скорости
   // Ищем заявки в окне ±5 минут от платежа
+  // ВАЖНО: Исключаем заявки со статусом api_error и deposit_failed - они обрабатываются вручную
   const matchingRequests = await prisma.request.findMany({
     where: {
       requestType: 'deposit',
-      status: 'pending',
+      status: 'pending', // Только pending заявки - api_error и deposit_failed обрабатываются вручную
       createdAt: { 
         gte: searchWindowStart, // 5 минут ДО платежа
         lte: actualSearchEnd, // 5 минут ПОСЛЕ платежа (но не в будущем)
@@ -221,8 +222,93 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     // Получаем текущий статус для проверки перед пополнением
     const requestStatusBeforeDeposit = await prisma.request.findUnique({
       where: { id: request.id },
-      select: { status: true },
+      select: { status: true, processedAt: true, updatedAt: true },
     })
+    
+    // ВАЖНО: Заявки со статусом api_error и deposit_failed обрабатываются вручную администратором
+    // Автопополнение не должно пытаться пополнить баланс для таких заявок
+    if (requestStatusBeforeDeposit?.status === 'api_error' || requestStatusBeforeDeposit?.status === 'deposit_failed') {
+      console.log(`⚠️ [Auto-Deposit] Request ${request.id} has status ${requestStatusBeforeDeposit.status}. Skipping auto-deposit - will be processed manually by admin.`)
+      
+      // Привязываем платеж к заявке, но не пытаемся пополнить баланс
+      await prisma.incomingPayment.update({
+        where: { id: paymentId },
+        data: {
+          requestId: request.id,
+          isProcessed: true,
+        },
+      })
+      
+      return {
+        requestId: request.id,
+        success: false,
+        statusUpdated: false,
+        paymentLinked: true,
+        skipped: true,
+        reason: `manual_processing_required_${requestStatusBeforeDeposit.status}`
+      }
+    }
+    
+    // Дополнительная проверка: проверяем, не было ли уже успешного пополнения для этого accountId и суммы в последние 5 минут
+    // Это защищает от повторных пополнений даже если заявка имеет статус pending
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    const recentSuccessfulDeposits = await prisma.request.findMany({
+      where: {
+        accountId: String(request.accountId),
+        bookmaker: request.bookmaker,
+        requestType: 'deposit',
+        status: {
+          in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
+        },
+        processedAt: {
+          gte: fiveMinutesAgo
+        },
+        id: {
+          not: request.id // Исключаем текущую заявку
+        }
+      },
+      select: {
+        id: true,
+        amount: true,
+        processedAt: true,
+      },
+      orderBy: {
+        processedAt: 'desc'
+      },
+      take: 1
+    })
+    
+    // Проверяем, есть ли пополнение с такой же суммой
+    const duplicateDeposit = recentSuccessfulDeposits.find(deposit => {
+      const depositAmount = typeof deposit.amount === 'string' 
+        ? parseFloat(deposit.amount) 
+        : (deposit.amount as any).toNumber ? (deposit.amount as any).toNumber() : Number(deposit.amount)
+      return Math.abs(depositAmount - requestAmount) < 0.01 // Разница не более 1 копейки
+    })
+    
+    if (duplicateDeposit) {
+      const timeDiff = Math.floor((Date.now() - duplicateDeposit.processedAt!.getTime()) / 1000 / 60)
+      const remainingMinutes = Math.max(0, 5 - timeDiff)
+      console.warn(`⚠️ [Auto-Deposit] Duplicate deposit detected! Found recent successful deposit for accountId ${request.accountId}, amount ${requestAmount}, ${timeDiff} minutes ago (Request ID: ${duplicateDeposit.id}). Skipping.`)
+      
+      // Привязываем платеж к заявке, но не пытаемся пополнить баланс
+      await prisma.incomingPayment.update({
+        where: { id: paymentId },
+        data: {
+          requestId: request.id,
+          isProcessed: true,
+        },
+      })
+      
+      return {
+        requestId: request.id,
+        success: false,
+        statusUpdated: false,
+        paymentLinked: true,
+        skipped: true,
+        reason: `duplicate_deposit_detected_${remainingMinutes}_minutes_remaining`
+      }
+    }
     
     // Если заявка уже completed/approved, временно обновляем статус на pending,
     // чтобы depositToCasino не считал её дубликатом

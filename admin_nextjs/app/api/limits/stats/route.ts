@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, createApiResponse } from '@/lib/api-helpers'
+import { Prisma } from '@prisma/client'
 // Импортируем планировщик для автоматического запуска
 import '@/lib/shift-scheduler'
 
@@ -158,6 +159,9 @@ export async function GET(request: NextRequest) {
       const now = new Date()
       const filterEnd = end >= today ? now : end
       
+      console.log(`📊 [Limits Stats] Period selected: ${startDate} - ${endDate}`)
+      console.log(`📊 [Limits Stats] Date filter for platform stats: gte=${start.toISOString()}, lte=${filterEnd.toISOString()}`)
+      
       dateFilterForStats = {
         createdAt: {
           gte: start,
@@ -208,19 +212,51 @@ export async function GET(request: NextRequest) {
       // Выполняем запрос статистики по платформам параллельно
       (async () => {
         // Строим условия для дат
+        // ВАЖНО: Используем строковое представление даты в формате, который PostgreSQL понимает как локальное время
+        // Это избегает проблем с часовыми поясами при передаче Date объектов
         let dateCondition = ''
         const dateParams: any[] = []
         
+        // Функция для форматирования Date в строку для PostgreSQL (локальное время)
+        const formatDateForPostgres = (date: Date): string => {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const hours = String(date.getHours()).padStart(2, '0')
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          const seconds = String(date.getSeconds()).padStart(2, '0')
+          const ms = String(date.getMilliseconds()).padStart(3, '0')
+          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`
+        }
+        
         if (dateFilterForStats.createdAt?.gte) {
+          const gteDate = dateFilterForStats.createdAt.gte instanceof Date 
+            ? formatDateForPostgres(dateFilterForStats.createdAt.gte)
+            : dateFilterForStats.createdAt.gte
           dateCondition += ` AND created_at >= $${dateParams.length + 1}::timestamp`
-          dateParams.push(dateFilterForStats.createdAt.gte)
+          dateParams.push(gteDate)
+          console.log(`📊 [Limits Stats] Platform stats date filter gte: ${gteDate}`)
         }
         if (dateFilterForStats.createdAt?.lt) {
+          const ltDate = dateFilterForStats.createdAt.lt instanceof Date 
+            ? formatDateForPostgres(dateFilterForStats.createdAt.lt)
+            : dateFilterForStats.createdAt.lt
           dateCondition += ` AND created_at < $${dateParams.length + 1}::timestamp`
-          dateParams.push(dateFilterForStats.createdAt.lt)
+          dateParams.push(ltDate)
+          console.log(`📊 [Limits Stats] Platform stats date filter lt: ${ltDate}`)
         } else if (dateFilterForStats.createdAt?.lte) {
+          const lteDate = dateFilterForStats.createdAt.lte instanceof Date 
+            ? formatDateForPostgres(dateFilterForStats.createdAt.lte)
+            : dateFilterForStats.createdAt.lte
           dateCondition += ` AND created_at <= $${dateParams.length + 1}::timestamp`
-          dateParams.push(dateFilterForStats.createdAt.lte)
+          dateParams.push(lteDate)
+          console.log(`📊 [Limits Stats] Platform stats date filter lte: ${lteDate}`)
+        }
+        
+        console.log(`📊 [Limits Stats] Platform stats date condition: ${dateCondition}`)
+        console.log(`📊 [Limits Stats] Platform stats date params count: ${dateParams.length}`)
+        if (dateParams.length > 0) {
+          console.log(`📊 [Limits Stats] Platform stats date params:`, dateParams)
         }
         
         return await prisma.$queryRawUnsafe<Array<{
@@ -272,15 +308,16 @@ export async function GET(request: NextRequest) {
         `, ...dateParams)
       })(),
       // Выполняем запрос данных графика параллельно
+      // ВАЖНО: Теперь считаем суммы вместо количества операций
       prisma.$queryRaw<Array<{ 
         date: string; 
-        deposit_count: bigint;
-        withdrawal_count: bigint;
+        deposit_sum: string | null;
+        withdrawal_sum: string | null;
       }>>`
         SELECT 
           DATE(created_at)::text as date,
-          SUM(CASE WHEN request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved') THEN 1 ELSE 0 END)::bigint as deposit_count,
-          SUM(CASE WHEN request_type = 'withdraw' AND status IN ('completed', 'approved', 'autodeposit_success', 'auto_completed') THEN 1 ELSE 0 END)::bigint as withdrawal_count
+          COALESCE(SUM(CASE WHEN request_type = 'deposit' AND status IN ('autodeposit_success', 'auto_completed', 'completed', 'approved') THEN amount ELSE 0 END), 0)::text as deposit_sum,
+          COALESCE(SUM(CASE WHEN request_type = 'withdraw' AND status IN ('completed', 'approved', 'autodeposit_success', 'auto_completed') THEN amount ELSE 0 END), 0)::text as withdrawal_sum
         FROM requests
         WHERE created_at >= ${chartStartDate}::timestamp
           AND created_at <= ${chartEndDate}::timestamp
@@ -358,9 +395,10 @@ export async function GET(request: NextRequest) {
     })
 
     // Обрабатываем данные графика (получены параллельно выше)
+    // ВАЖНО: Теперь используем суммы вместо количества
     const chartDataSafe = chartData || []
-    const depositsByDate = chartDataSafe.map((d: any) => ({ date: d.date, count: d.deposit_count }))
-    const withdrawalsByDate = chartDataSafe.map((d: any) => ({ date: d.date, count: d.withdrawal_count }))
+    const depositsByDate = chartDataSafe.map((d: any) => ({ date: d.date, sum: parseFloat(d.deposit_sum || '0') }))
+    const withdrawalsByDate = chartDataSafe.map((d: any) => ({ date: d.date, sum: parseFloat(d.withdrawal_sum || '0') }))
 
     // Форматируем даты для графика (YYYY-MM-DD -> dd.mm)
     const formatDate = (dateStr: string) => {
@@ -369,9 +407,9 @@ export async function GET(request: NextRequest) {
     }
 
     const depositsLabels = depositsByDate.map((d: any) => formatDate(d.date))
-    const depositsData = depositsByDate.map((d: any) => Number(d.count))
+    const depositsData = depositsByDate.map((d: any) => d.sum)
     const withdrawalsLabels = withdrawalsByDate.map((d: any) => formatDate(d.date))
-    const withdrawalsData = withdrawalsByDate.map((d: any) => Number(d.count))
+    const withdrawalsData = withdrawalsByDate.map((d: any) => d.sum)
 
     // Создаем мапу для быстрого доступа
     const depositsDateMap = new Map<string, string>()
