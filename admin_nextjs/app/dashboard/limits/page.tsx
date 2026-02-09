@@ -77,13 +77,18 @@ export default function LimitsPage() {
       if (end) params.append('end', end)
 
       // Загружаем статистику и смены параллельно
-      // Используем кеш для ускорения (Next.js автоматически использует кеш из headers)
+      // Умное кеширование: для прошлых периодов используем кеш, для сегодня - нет
+      const today = new Date().toISOString().split('T')[0]
+      const useCache = start && end && end < today // Кешируем только для прошлых периодов
+      
       const [statsResponse, shiftsResponse] = await Promise.all([
         fetch(`/api/limits/stats?${params.toString()}`, {
-          next: { revalidate: start && end ? 30 : 5 }, // Кеш: 30 сек для периода, 5 сек для сегодня
+          cache: useCache ? 'default' : 'no-store', // Кеш только для прошлых периодов
+          next: useCache ? { revalidate: 120 } : undefined, // 2 минуты для прошлых периодов
         }),
         (start && end) ? fetch(`/api/shifts?start=${start}&end=${end}`, {
-          next: { revalidate: 30 }, // Кеш для смен
+          cache: useCache ? 'default' : 'no-store', // Кеш только для прошлых периодов
+          next: useCache ? { revalidate: 120 } : undefined,
         }) : Promise.resolve(null),
       ])
       

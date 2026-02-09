@@ -49,293 +49,94 @@ export async function GET(request: NextRequest) {
     let approximateIncome = 0
 
     if (startDate && endDate) {
-      // Период выбран - получаем все закрытые смены за этот период и суммируем
+      // Период выбран - ВСЕГДА считаем напрямую из requests для точности и актуальности
+      // Упрощенная логика: не смешиваем закрытые смены с актуальными данными
       const start = new Date(startDate)
       start.setHours(0, 0, 0, 0)
       const end = new Date(endDate)
       end.setHours(23, 59, 59, 999)
-
-      // Пытаемся получить закрытые смены за период
-      let shifts: any[] = []
-      try {
-        // @ts-ignore - dailyShift может быть не в типах, если Prisma Client не обновлен
-        shifts = await prisma.dailyShift.findMany({
-          where: {
-            shiftDate: {
-              gte: start,
-              lte: end,
-            },
-            isClosed: true, // Только закрытые смены
-          },
-          orderBy: {
-            shiftDate: 'asc',
-          },
-        })
-      } catch (dbError: any) {
-        // Если таблица не существует, просто продолжаем без смен
-        if (dbError.message?.includes('does not exist') || 
-            dbError.message?.includes('Unknown model') ||
-            dbError.code === 'P2021') {
-          console.warn('⚠️ [Limits Stats] DailyShift table does not exist yet. Run: npx prisma db push')
-          shifts = []
-        } else {
-          throw dbError
-        }
-      }
-
-      // Суммируем все смены за период
-      shifts.forEach((shift) => {
-        totalDepositsSum += parseFloat(shift.depositsSum.toString())
-        totalDepositsCount += shift.depositsCount
-        totalWithdrawalsSum += parseFloat(shift.withdrawalsSum.toString())
-        totalWithdrawalsCount += shift.withdrawalsCount
-        approximateIncome += parseFloat(shift.netProfit.toString())
-      })
-
-      // Также учитываем незакрытые смены за период (если есть дни, которые еще не закрыты)
-      // Получаем список всех закрытых смен за период
-      const closedShiftDates = new Set(
-        shifts.map((shift) => shift.shiftDate.toISOString().split('T')[0])
-      )
-
-      // Получаем все смены за период (включая незакрытые) для определения, какие дни нужно считать из requests
-      let allShiftsInPeriod: any[] = []
-      try {
-        // @ts-ignore - dailyShift может быть не в типах, если Prisma Client не обновлен
-        allShiftsInPeriod = await prisma.dailyShift.findMany({
-          where: {
-            shiftDate: {
-              gte: start,
-              lte: end,
-            },
-          },
-        })
-      } catch (dbError: any) {
-        // Игнорируем ошибки таблицы
-        if (!(dbError.message?.includes('does not exist') || 
-              dbError.message?.includes('Unknown model') ||
-              dbError.code === 'P2021')) {
-          throw dbError
-        }
-      }
-
-      // Определяем, какие дни нужно считать из requests (не закрытые смены)
+      
+      // Если период включает сегодня, считаем до текущего момента
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const now = new Date()
+      const filterEnd = end >= today ? now : end
 
-      // Создаем Set всех дат, для которых есть закрытые смены
-      const allShiftDates = new Set(
-        allShiftsInPeriod
-          .filter((s) => s.isClosed)
-          .map((s) => s.shiftDate.toISOString().split('T')[0])
-      )
-
-      // Для незакрытых дней считаем напрямую из requests одним запросом
-      // Но нужно быть осторожным: если период большой, лучше считать по дням
-      // Для оптимизации: считаем все незакрытые дни одним запросом, но только если период не слишком большой
-      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      
-      if (daysDiff <= 31) {
-        // Период небольшой - можем считать все незакрытые дни одним запросом
-        // Но нужно исключить закрытые дни из подсчета
-        // Для этого используем более сложную логику: считаем все requests за период,
-        // но исключаем те, которые уже учтены в закрытых сменах
-        
-        // ВАЖНО: Это упрощение - мы считаем все requests за период, включая закрытые дни
-        // Но потом вычитаем суммы закрытых смен, чтобы не было дублирования
-        // Это работает только если закрытые смены считают те же статусы, что и мы
-        
-        // Сначала получаем общую статистику за весь период
-        const [periodDepositStats, periodWithdrawalStats] = await Promise.all([
-          prisma.request.aggregate({
-            where: {
-              requestType: 'deposit',
-              status: { in: depositSuccessStatuses },
-              createdAt: {
-                gte: start,
-                lte: end,
-              },
-            },
-            _count: { id: true },
-            _sum: { amount: true },
-          }),
-          prisma.request.aggregate({
-            where: {
-              requestType: 'withdraw',
-              status: { in: withdrawalSuccessStatuses },
-              createdAt: {
-                gte: start,
-                lte: end,
-              },
-            },
-            _count: { id: true },
-            _sum: { amount: true },
-          }),
-        ])
-
-        const periodDepositsSum = parseFloat(periodDepositStats._sum.amount?.toString() || '0')
-        const periodDepositsCount = periodDepositStats._count.id || 0
-        const periodWithdrawalsSum = parseFloat(periodWithdrawalStats._sum.amount?.toString() || '0')
-        const periodWithdrawalsCount = periodWithdrawalStats._count.id || 0
-
-        // Вычисляем суммы из закрытых смен (уже учтены выше)
-        let closedDepositsSum = 0
-        let closedDepositsCount = 0
-        let closedWithdrawalsSum = 0
-        let closedWithdrawalsCount = 0
-
-        shifts.forEach((shift) => {
-          closedDepositsSum += parseFloat(shift.depositsSum.toString())
-          closedDepositsCount += shift.depositsCount
-          closedWithdrawalsSum += parseFloat(shift.withdrawalsSum.toString())
-          closedWithdrawalsCount += shift.withdrawalsCount
-        })
-
-        // Добавляем разницу (незакрытые дни) к уже посчитанным закрытым сменам
-        const unclosedDepositsSum = periodDepositsSum - closedDepositsSum
-        const unclosedDepositsCount = periodDepositsCount - closedDepositsCount
-        const unclosedWithdrawalsSum = periodWithdrawalsSum - closedWithdrawalsSum
-        const unclosedWithdrawalsCount = periodWithdrawalsCount - closedWithdrawalsCount
-
-        // Добавляем незакрытые дни к уже посчитанным закрытым сменам
-        totalDepositsSum += unclosedDepositsSum
-        totalDepositsCount += unclosedDepositsCount
-        totalWithdrawalsSum += unclosedWithdrawalsSum
-        totalWithdrawalsCount += unclosedWithdrawalsCount
-        
-        // Добавляем прибыль от незакрытых дней
-        approximateIncome += unclosedDepositsSum * PROFIT_DEPOSIT_PERCENT + unclosedWithdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
-      } else {
-        // Период большой - считаем только незакрытые дни (оптимизация)
-        // Для каждого незакрытого дня делаем отдельный запрос
-        const datesInPeriod: Date[] = []
-        const currentDate = new Date(start)
-        while (currentDate <= end) {
-          const dateStr = currentDate.toISOString().split('T')[0]
-          if (!allShiftDates.has(dateStr)) {
-            datesInPeriod.push(new Date(currentDate))
-          }
-          currentDate.setDate(currentDate.getDate() + 1)
-        }
-
-        // Считаем незакрытые дни
-        for (const date of datesInPeriod) {
-          const dayStart = new Date(date)
-          dayStart.setHours(0, 0, 0, 0)
-          const dayEnd = new Date(date)
-          dayEnd.setHours(23, 59, 59, 999)
-          
-          // Если это сегодня - считаем до текущего момента, иначе до конца дня
-          const filterEnd = date.toDateString() === today.toDateString() ? now : dayEnd
-
-          const dayFilter = {
+      // Считаем статистику напрямую из requests за весь период
+      const [depositStats, withdrawalStats] = await Promise.all([
+        prisma.request.aggregate({
+          where: {
+            requestType: 'deposit',
+            status: { in: depositSuccessStatuses },
             createdAt: {
-              gte: dayStart,
+              gte: start,
               lte: filterEnd,
             },
-          }
+          },
+          _count: { id: true },
+          _sum: { amount: true },
+        }),
+        prisma.request.aggregate({
+          where: {
+            requestType: 'withdraw',
+            status: { in: withdrawalSuccessStatuses },
+            createdAt: {
+              gte: start,
+              lte: filterEnd,
+            },
+          },
+          _count: { id: true },
+          _sum: { amount: true },
+        }),
+      ])
 
-          const [dayDepositStats, dayWithdrawalStats] = await Promise.all([
-            prisma.request.aggregate({
-              where: {
-                requestType: 'deposit',
-                status: { in: depositSuccessStatuses },
-                ...dayFilter,
-              },
-              _count: { id: true },
-              _sum: { amount: true },
-            }),
-            prisma.request.aggregate({
-              where: {
-                requestType: 'withdraw',
-                status: { in: withdrawalSuccessStatuses },
-                ...dayFilter,
-              },
-              _count: { id: true },
-              _sum: { amount: true },
-            }),
-          ])
-
-          totalDepositsSum += parseFloat(dayDepositStats._sum.amount?.toString() || '0')
-          totalDepositsCount += dayDepositStats._count.id || 0
-          totalWithdrawalsSum += parseFloat(dayWithdrawalStats._sum.amount?.toString() || '0')
-          totalWithdrawalsCount += dayWithdrawalStats._count.id || 0
-          approximateIncome += parseFloat(dayDepositStats._sum.amount?.toString() || '0') * PROFIT_DEPOSIT_PERCENT + 
-                              parseFloat(dayWithdrawalStats._sum.amount?.toString() || '0') * PROFIT_WITHDRAWAL_PERCENT
-        }
-      }
+      totalDepositsCount = depositStats._count.id || 0
+      totalDepositsSum = parseFloat(depositStats._sum.amount?.toString() || '0')
+      totalWithdrawalsCount = withdrawalStats._count.id || 0
+      totalWithdrawalsSum = parseFloat(withdrawalStats._sum.amount?.toString() || '0')
+      approximateIncome = totalDepositsSum * PROFIT_DEPOSIT_PERCENT + totalWithdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
     } else {
       // Период не выбран - показываем данные за сегодня (с 00:00 сегодня)
-      // Сначала проверяем, есть ли закрытая смена за сегодня
+      // ВАЖНО: Для сегодняшнего дня всегда считаем актуальные данные из requests,
+      // независимо от того, закрыта смена или нет. Закрытая смена - это для исторических данных.
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const now = new Date()
 
-      // Проверяем, есть ли закрытая смена за сегодня
-      let todayShift: any = null
-      try {
-        // @ts-ignore - dailyShift может быть не в типах, если Prisma Client не обновлен
-        todayShift = await prisma.dailyShift.findUnique({
+      // Всегда считаем данные напрямую из requests за сегодня для актуальности
+      const todayFilter = {
+        createdAt: {
+          gte: today,
+          lte: now,
+        },
+      }
+
+      const [depositStats, withdrawalStats] = await Promise.all([
+        prisma.request.aggregate({
           where: {
-            shiftDate: today,
+            requestType: 'deposit',
+            status: { in: depositSuccessStatuses },
+            ...todayFilter,
           },
-        })
-      } catch (dbError: any) {
-        // Если таблица не существует, просто продолжаем без смены
-        if (dbError.message?.includes('does not exist') || 
-            dbError.message?.includes('Unknown model') ||
-            dbError.code === 'P2021') {
-          console.warn('⚠️ [Limits Stats] DailyShift table does not exist yet. Run: npx prisma db push')
-          todayShift = null
-        } else {
-          throw dbError
-        }
-      }
-
-      if (todayShift && todayShift.isClosed) {
-        // Используем данные из закрытой смены
-        totalDepositsSum = parseFloat(todayShift.depositsSum.toString())
-        totalDepositsCount = todayShift.depositsCount
-        totalWithdrawalsSum = parseFloat(todayShift.withdrawalsSum.toString())
-        totalWithdrawalsCount = todayShift.withdrawalsCount
-        approximateIncome = parseFloat(todayShift.netProfit.toString())
-      } else {
-        // Смена еще не закрыта - считаем данные напрямую из requests за сегодня
-        const todayFilter = {
-          createdAt: {
-            gte: today,
-            lte: now,
+          _count: { id: true },
+          _sum: { amount: true },
+        }),
+        prisma.request.aggregate({
+          where: {
+            requestType: 'withdraw',
+            status: { in: withdrawalSuccessStatuses },
+            ...todayFilter,
           },
-        }
+          _count: { id: true },
+          _sum: { amount: true },
+        }),
+      ])
 
-        const [depositStats, withdrawalStats] = await Promise.all([
-          prisma.request.aggregate({
-            where: {
-              requestType: 'deposit',
-              status: { in: depositSuccessStatuses },
-              ...todayFilter,
-            },
-            _count: { id: true },
-            _sum: { amount: true },
-          }),
-          prisma.request.aggregate({
-            where: {
-              requestType: 'withdraw',
-              status: { in: withdrawalSuccessStatuses },
-              ...todayFilter,
-            },
-            _count: { id: true },
-            _sum: { amount: true },
-          }),
-        ])
-
-        totalDepositsCount = depositStats._count.id || 0
-        totalDepositsSum = parseFloat(depositStats._sum.amount?.toString() || '0')
-        totalWithdrawalsCount = withdrawalStats._count.id || 0
-        totalWithdrawalsSum = parseFloat(withdrawalStats._sum.amount?.toString() || '0')
-        approximateIncome = totalDepositsSum * PROFIT_DEPOSIT_PERCENT + totalWithdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
-      }
+      totalDepositsCount = depositStats._count.id || 0
+      totalDepositsSum = parseFloat(depositStats._sum.amount?.toString() || '0')
+      totalWithdrawalsCount = withdrawalStats._count.id || 0
+      totalWithdrawalsSum = parseFloat(withdrawalStats._sum.amount?.toString() || '0')
+      approximateIncome = totalDepositsSum * PROFIT_DEPOSIT_PERCENT + totalWithdrawalsSum * PROFIT_WITHDRAWAL_PERCENT
     }
 
     // Для статистики по платформам используем ТОЧНО ТЕ ЖЕ данные, что и для общей статистики
@@ -350,53 +151,36 @@ export async function GET(request: NextRequest) {
       start.setHours(0, 0, 0, 0)
       const end = new Date(endDate)
       end.setHours(23, 59, 59, 999)
+      
+      // Если период включает сегодня, считаем до текущего момента
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const now = new Date()
+      const filterEnd = end >= today ? now : end
+      
       dateFilterForStats = {
         createdAt: {
           gte: start,
-          lte: end,
+          lte: filterEnd,
         },
       }
       // Для периода всегда используем requests напрямую (DailyShift не хранит разбивку по платформам)
       useDirectRequests = true
     } else {
-      // Период не выбран - используем те же данные, что и для общей статистики
+      // Период не выбран - используем актуальные данные за сегодня
+      // ВАЖНО: Всегда используем актуальные данные из requests за сегодня
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const now = new Date()
       
-      // Проверяем, откуда взялась общая статистика (из DailyShift или из requests)
-      let todayShift: any = null
-      try {
-        // @ts-ignore - dailyShift может быть не в типах, если Prisma Client не обновлен
-        todayShift = await prisma.dailyShift.findUnique({
-          where: {
-            shiftDate: today,
-          },
-        })
-      } catch (dbError: any) {
-        // Игнорируем ошибки таблицы
+      // Всегда используем актуальные данные за сегодня (до текущего момента)
+      dateFilterForStats = {
+        createdAt: {
+          gte: today,
+          lte: now,
+        },
       }
-      
-      if (todayShift && todayShift.isClosed) {
-        // Общая статистика взята из DailyShift, но для платформ все равно используем requests
-        // так как DailyShift не хранит разбивку по платформам
-        dateFilterForStats = {
-          createdAt: {
-            gte: today,
-            lte: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1), // До конца дня
-          },
-        }
-        useDirectRequests = true
-      } else {
-        // Общая статистика взята из requests - используем те же фильтры
-        dateFilterForStats = {
-          createdAt: {
-            gte: today,
-            lte: now,
-          },
-        }
-        useDirectRequests = true
-      }
+      useDirectRequests = true
     }
 
     // Данные для графика - вычисляем даты заранее
@@ -702,12 +486,25 @@ export async function GET(request: NextRequest) {
       })
     )
     
-    // Кеширование: если период выбран (закрытые смены) - кешируем на 30 секунд
-    // Если период не выбран (текущий день) - кешируем на 5 секунд для свежести данных
+    // Умное кеширование для баланса между актуальностью и производительностью
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
     if (startDate && endDate) {
-      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      
+      // Если период полностью в прошлом - кешируем на 2 минуты (данные не меняются)
+      if (end < today) {
+        response.headers.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300')
+      } 
+      // Если период включает сегодня - минимальное кеширование (10 секунд)
+      else {
+        response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30')
+      }
     } else {
-      response.headers.set('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=15')
+      // Сегодняшний день - очень короткое кеширование (3 секунды) для актуальности
+      response.headers.set('Cache-Control', 'public, s-maxage=3, stale-while-revalidate=10')
     }
     
     return response
