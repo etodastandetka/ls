@@ -11,19 +11,93 @@ import { processReferralEarning } from './referral-earnings'
 export async function matchAndProcessPayment(paymentId: number, amount: number) {
   console.log(`🔍 [Auto-Deposit] matchAndProcessPayment called: paymentId=${paymentId}, amount=${amount}`)
   
-  // ВАЖНО: Получаем информацию о платеже, чтобы проверить время поступления
-  const payment = await prisma.incomingPayment.findUnique({
-    where: { id: paymentId },
-    select: { paymentDate: true, createdAt: true, isProcessed: true },
+  // КРИТИЧЕСКИ ВАЖНО: Атомарная блокировка платежа для предотвращения параллельной обработки
+  // Используем атомарную операцию updateMany с условием, чтобы гарантировать, что только один процесс обработает платеж
+  const lockResult = await prisma.$transaction(async (tx) => {
+    // Сначала получаем информацию о платеже
+    const payment = await tx.incomingPayment.findUnique({
+      where: { id: paymentId },
+      select: { 
+        paymentDate: true, 
+        createdAt: true, 
+        isProcessed: true,
+        requestId: true,
+        updatedAt: true
+      },
+    })
+    
+    if (!payment) {
+      return { locked: false, reason: 'payment_not_found', payment: null }
+    }
+    
+    // Если платеж уже обработан - сразу выходим
+    if (payment.isProcessed) {
+      console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed (requestId: ${payment.requestId}), skipping`)
+      return { locked: false, reason: 'payment_already_processed', payment }
+    }
+    
+    // Атомарно пытаемся заблокировать платеж, обновляя updatedAt только если isProcessed = false
+    // Это гарантирует, что только один процесс сможет заблокировать платеж
+    // Проверяем также, не обрабатывается ли платеж прямо сейчас (обновлен менее 30 секунд назад с установленным requestId)
+    const thirtySecondsAgo = new Date(Date.now() - 30 * 1000)
+    const isRecentlyUpdated = payment.updatedAt && payment.updatedAt > thirtySecondsAgo && payment.requestId !== null
+    
+    if (isRecentlyUpdated) {
+      console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} is being processed by another process (updated ${Math.floor((Date.now() - payment.updatedAt.getTime()) / 1000)}s ago), skipping`)
+      return { locked: false, reason: 'payment_being_processed', payment }
+    }
+    
+    // Атомарно обновляем updatedAt только если isProcessed = false
+    const updateResult = await tx.incomingPayment.updateMany({
+      where: {
+        id: paymentId,
+        isProcessed: false,
+      },
+      data: {
+        updatedAt: new Date(), // Обновляем время для блокировки
+      },
+    })
+    
+    // Если не удалось обновить (count = 0) - значит платеж уже обработан другим процессом
+    if (updateResult.count === 0) {
+      // Проверяем текущее состояние еще раз
+      const currentPayment = await tx.incomingPayment.findUnique({
+        where: { id: paymentId },
+        select: { isProcessed: true, requestId: true, updatedAt: true },
+      })
+      
+      if (currentPayment?.isProcessed) {
+        console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} was processed by another process, skipping`)
+        return { locked: false, reason: 'payment_processed_by_another', payment: currentPayment }
+      }
+      
+      console.log(`⚠️ [Auto-Deposit] Could not lock payment ${paymentId} (already being processed)`)
+      return { locked: false, reason: 'lock_failed', payment }
+    }
+    
+    return { locked: true, payment }
+  }, {
+    isolationLevel: 'Serializable', // Максимальная изоляция для предотвращения race conditions
   })
   
-  if (!payment) {
-    console.error(`❌ [Auto-Deposit] Payment ${paymentId} not found`)
+  if (!lockResult.locked || !lockResult.payment) {
+    // Если не удалось заблокировать - возвращаем null (платеж уже обрабатывается)
     return null
   }
   
-  if (payment.isProcessed) {
-    console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed, skipping`)
+  // Получаем полную информацию о платеже после блокировки
+  const payment = await prisma.incomingPayment.findUnique({
+    where: { id: paymentId },
+    select: { 
+      paymentDate: true, 
+      createdAt: true, 
+      isProcessed: true,
+      requestId: true 
+    },
+  })
+  
+  if (!payment || payment.isProcessed) {
+    console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} was processed while locking, skipping`)
     return null
   }
   
@@ -222,15 +296,127 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     // Получаем текущий статус для проверки перед пополнением
     const requestStatusBeforeDeposit = await prisma.request.findUnique({
       where: { id: request.id },
-      select: { status: true, processedAt: true, updatedAt: true },
+      select: { status: true, statusDetail: true, processedAt: true, updatedAt: true },
     })
+    
+    // ВАЖНО: Если заявка имеет статус api_error, проверяем, не был ли депозит фактически выполнен
+    // Это может произойти если API вернул ошибку "уже был проведен" или "Слишком много запросов"
+    // но депозит на самом деле был успешно выполнен
+    if (requestStatusBeforeDeposit?.status === 'api_error') {
+      const errorMessage = requestStatusBeforeDeposit.statusDetail || ''
+      const isDepositAlreadyDoneError = 
+        errorMessage.includes('уже был проведен') || 
+        errorMessage.includes('уже был') ||
+        errorMessage.includes('Слишком много запросов') ||
+        errorMessage.includes('Попробуйте позже')
+      
+      if (isDepositAlreadyDoneError) {
+        console.log(`🔍 [Auto-Deposit] Request ${request.id} has api_error with "already done" message. Checking if deposit was actually successful...`)
+        
+        // Проверяем, был ли действительно выполнен депозит для этого accountId и суммы в последние 5 минут
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+        const recentSuccessfulDeposits = await prisma.request.findMany({
+          where: {
+            accountId: String(request.accountId),
+            bookmaker: request.bookmaker,
+            requestType: 'deposit',
+            status: {
+              in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
+            },
+            processedAt: {
+              gte: fiveMinutesAgo
+            },
+            id: {
+              not: request.id // Исключаем текущую заявку
+            }
+          },
+          select: {
+            id: true,
+            amount: true,
+            processedAt: true,
+          },
+          orderBy: {
+            processedAt: 'desc'
+          },
+          take: 1
+        })
+        
+        // Проверяем, есть ли пополнение с такой же суммой
+        const duplicateDeposit = recentSuccessfulDeposits.find(deposit => {
+          const depositAmount = typeof deposit.amount === 'string' 
+            ? parseFloat(deposit.amount) 
+            : (deposit.amount as any).toNumber ? (deposit.amount as any).toNumber() : Number(deposit.amount)
+          return Math.abs(depositAmount - requestAmount) < 0.01 // Разница не более 1 копейки
+        })
+        
+        if (duplicateDeposit) {
+          console.log(`✅ [Auto-Deposit] Found successful deposit for accountId ${request.accountId}, amount ${requestAmount} (Request ID: ${duplicateDeposit.id}). Updating status from api_error to autodeposit_success.`)
+          
+          // Обновляем статус на autodeposit_success и привязываем платеж
+          await prisma.$transaction(async (tx) => {
+            await tx.request.update({
+              where: { id: request.id },
+              data: {
+                status: 'autodeposit_success',
+                statusDetail: null,
+                processedBy: 'автопополнение' as any,
+                processedAt: new Date(),
+                updatedAt: new Date(),
+              } as any,
+            })
+            
+            await tx.incomingPayment.update({
+              where: { id: paymentId },
+              data: {
+                requestId: request.id,
+                isProcessed: true,
+              },
+            })
+          })
+          
+          console.log(`✅ [Auto-Deposit] Request ${request.id} status updated from api_error to autodeposit_success (deposit was actually successful)`)
+          
+          return {
+            requestId: request.id,
+            success: true,
+            statusUpdated: true,
+            paymentLinked: true,
+            skipped: false,
+            reason: 'api_error_corrected_to_success'
+          }
+        } else {
+          console.log(`⚠️ [Auto-Deposit] Request ${request.id} has api_error but no successful deposit found. Keeping api_error status.`)
+        }
+      }
+    }
     
     // ВАЖНО: Заявки со статусом api_error и deposit_failed обрабатываются вручную администратором
     // Автопополнение не должно пытаться пополнить баланс для таких заявок
-    if (requestStatusBeforeDeposit?.status === 'api_error' || requestStatusBeforeDeposit?.status === 'deposit_failed') {
-      console.log(`⚠️ [Auto-Deposit] Request ${request.id} has status ${requestStatusBeforeDeposit.status}. Skipping auto-deposit - will be processed manually by admin.`)
+    // Также проверяем, не был ли депозит уже выполнен (статусы completed, approved, autodeposit_success)
+    const skipStatuses = ['api_error', 'deposit_failed', 'completed', 'approved', 'autodeposit_success', 'auto_completed']
+    if (requestStatusBeforeDeposit?.status && skipStatuses.includes(requestStatusBeforeDeposit.status)) {
+      console.log(`⚠️ [Auto-Deposit] Request ${request.id} has status ${requestStatusBeforeDeposit.status}. Skipping auto-deposit.`)
       
-      // Привязываем платеж к заявке, но не пытаемся пополнить баланс
+      // Если заявка уже успешно обработана - привязываем платеж и выходим
+      if (['completed', 'approved', 'autodeposit_success', 'auto_completed'].includes(requestStatusBeforeDeposit.status)) {
+        await prisma.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        return {
+          requestId: request.id,
+          success: true,
+          statusUpdated: false,
+          paymentLinked: true,
+          skipped: true,
+          reason: `request_already_${requestStatusBeforeDeposit.status}`
+        }
+      }
+      
+      // Для api_error и deposit_failed - привязываем платеж, но не пополняем
       await prisma.incomingPayment.update({
         where: { id: paymentId },
         data: {
@@ -336,6 +522,39 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       const errorMessage = depositResult.message || 'Deposit failed'
       console.error(`❌ [Auto-Deposit] Deposit failed: ${errorMessage}`)
       
+      // ВАЖНО: Проверяем, не был ли депозит уже выполнен другим процессом
+      // Это может произойти если два процесса пытались пополнить одновременно
+      const currentRequestCheck = await prisma.request.findUnique({
+        where: { id: request.id },
+        select: { status: true, processedBy: true },
+      })
+      
+      // Если заявка уже успешно обработана - не устанавливаем api_error
+      if (currentRequestCheck?.status === 'autodeposit_success' || 
+          currentRequestCheck?.status === 'completed' || 
+          currentRequestCheck?.status === 'approved' ||
+          currentRequestCheck?.status === 'auto_completed') {
+        console.log(`⚠️ [Auto-Deposit] Request ${request.id} was already processed (status: ${currentRequestCheck.status}) by another process. Not setting api_error.`)
+        
+        // Привязываем платеж к заявке
+        await prisma.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        
+        return {
+          requestId: request.id,
+          success: true,
+          statusUpdated: false,
+          paymentLinked: true,
+          skipped: true,
+          reason: 'deposit_already_completed_by_another_process'
+        }
+      }
+      
       // Восстанавливаем исходный статус если был изменен
       if (requestStatusBeforeDeposit?.status === 'completed' || requestStatusBeforeDeposit?.status === 'approved') {
         await prisma.request.update({
@@ -348,20 +567,31 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       }
       
       // Сохраняем ошибку в БД для отображения в админке
-      try {
-        await prisma.request.update({
-          where: { id: request.id },
-          data: {
-            status: 'api_error',
-            statusDetail: errorMessage.length > 50 ? errorMessage.substring(0, 50) : errorMessage,
-            processedAt: new Date(),
-            updatedAt: new Date(),
-          } as any,
-        })
-        console.log(`⚠️ [Auto-Deposit] Saved error to request ${request.id}: ${errorMessage}`)
-      } catch (dbError: any) {
-        console.error(`❌ [Auto-Deposit] Failed to save error to DB:`, dbError.message)
+      // НО только если заявка все еще в статусе pending
+      if (currentRequestCheck?.status === 'pending') {
+        try {
+          await prisma.request.update({
+            where: { id: request.id },
+            data: {
+              status: 'api_error',
+              statusDetail: errorMessage.length > 50 ? errorMessage.substring(0, 50) : errorMessage,
+              processedAt: new Date(),
+              updatedAt: new Date(),
+            } as any,
+          })
+          console.log(`⚠️ [Auto-Deposit] Saved error to request ${request.id}: ${errorMessage}`)
+        } catch (dbError: any) {
+          console.error(`❌ [Auto-Deposit] Failed to save error to DB:`, dbError.message)
+        }
       }
+      
+      // Освобождаем блокировку платежа перед выбросом ошибки
+      await prisma.incomingPayment.update({
+        where: { id: paymentId },
+        data: {
+          requestId: null, // Сбрасываем временный маркер
+        },
+      })
       
       throw new Error(errorMessage)
     }
@@ -383,10 +613,26 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         }),
       ])
       
-      // КРИТИЧЕСКИ ВАЖНО: Если платеж уже обработан - пропускаем (защита от двойного пополнения)
-      if (currentPayment?.isProcessed) {
-        console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed (requestId: ${currentPayment.requestId}), skipping`)
-        return { skipped: true, reason: 'payment_already_processed' }
+      // КРИТИЧЕСКИ ВАЖНО: Если платеж уже обработан другим процессом - пропускаем (защита от двойного пополнения)
+      if (currentPayment?.isProcessed && currentPayment.requestId !== request.id) {
+        console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed by another process (requestId: ${currentPayment.requestId}), skipping`)
+        return { skipped: true, reason: 'payment_already_processed_by_another_process' }
+      }
+      
+      // Если заявка уже успешно обработана другим процессом - просто привязываем платеж
+      if (currentRequest?.status === 'autodeposit_success' || 
+          currentRequest?.status === 'completed' || 
+          currentRequest?.status === 'approved' ||
+          currentRequest?.status === 'auto_completed') {
+        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already processed (status: ${currentRequest.status}), but deposit was successful. Linking payment.`)
+        await tx.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        return { skipped: true, reason: 'request_already_processed', paymentLinked: true }
       }
       
       // Если заявка уже обработана автопополнением - все равно привязываем платеж
@@ -683,6 +929,38 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     }
   } catch (error: any) {
     console.error(`❌ [Auto-Deposit] FAILED for request ${request.id}:`, error.message)
+    
+    // ВАЖНО: Блокировка автоматически освободится через 30 секунд (через проверку updatedAt)
+    // Но если платеж не был обработан, можно явно сбросить requestId
+    try {
+      const currentPayment = await prisma.incomingPayment.findUnique({
+        where: { id: paymentId },
+        select: { requestId: true, isProcessed: true },
+      })
+      
+      // Если платеж не был обработан и requestId установлен - сбрасываем его
+      if (currentPayment && !currentPayment.isProcessed && currentPayment.requestId !== null) {
+        // Проверяем, не был ли requestId установлен другим процессом
+        const requestCheck = await prisma.request.findUnique({
+          where: { id: currentPayment.requestId },
+          select: { id: true },
+        })
+        
+        // Если requestId не соответствует реальной заявке - сбрасываем
+        if (!requestCheck) {
+          await prisma.incomingPayment.update({
+            where: { id: paymentId },
+            data: {
+              requestId: null,
+            },
+          })
+          console.log(`🔓 [Auto-Deposit] Released lock on payment ${paymentId} after error`)
+        }
+      }
+    } catch (unlockError: any) {
+      console.error(`❌ [Auto-Deposit] Failed to release lock on payment ${paymentId}:`, unlockError.message)
+    }
+    
     throw error
   }
 }
