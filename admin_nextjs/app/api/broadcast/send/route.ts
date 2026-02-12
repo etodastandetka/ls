@@ -231,15 +231,31 @@ export async function POST(request: NextRequest) {
     })
 
     // Фильтруем только пользователей с валидными числовыми userId (Telegram ID)
-    const users = allUsers.filter(user => {
+    const validUsers = allUsers.filter(user => {
       if (!user.userId) return false
       const userIdString = user.userId.toString().trim()
       // Проверяем, что userId является числом (Telegram ID всегда числовой)
       return userIdString !== '' && /^\d+$/.test(userIdString)
     })
 
+    // ВАЖНО: Убираем дубликаты userId - используем Set для отслеживания уникальных ID
+    const seenUserIds = new Set<string>()
+    const users = validUsers.filter(user => {
+      const userIdString = user.userId.toString()
+      if (seenUserIds.has(userIdString)) {
+        return false // Пропускаем дубликат
+      }
+      seenUserIds.add(userIdString)
+      return true
+    })
+
+    const duplicateCount = validUsers.length - users.length
+    if (duplicateCount > 0) {
+      console.warn(`⚠️ [Broadcast] Removed ${duplicateCount} duplicate userId(s). Proceeding with ${users.length} unique users.`)
+    }
+
     if (users.length === 0) {
-      const invalidCount = allUsers.length - users.length
+      const invalidCount = allUsers.length - validUsers.length
       if (invalidCount > 0) {
         console.warn(`⚠️ [Broadcast] Filtered out ${invalidCount} users with invalid userId format`)
       }
@@ -250,8 +266,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (allUsers.length > users.length) {
-      const invalidCount = allUsers.length - users.length
-      console.warn(`⚠️ [Broadcast] Filtered out ${invalidCount} users with invalid userId format. Proceeding with ${users.length} valid users.`)
+      const invalidCount = allUsers.length - validUsers.length
+      const totalFiltered = invalidCount + duplicateCount
+      console.warn(`⚠️ [Broadcast] Filtered out ${totalFiltered} users (${invalidCount} invalid format, ${duplicateCount} duplicates). Proceeding with ${users.length} unique valid users.`)
     }
 
     let successCount = 0
