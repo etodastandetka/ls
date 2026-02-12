@@ -845,9 +845,49 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
 
     // Отправляем уведомление пользователю в бот, если заявка создана через бот
     // ВАЖНО: Отправляем только если статус действительно обновился на autodeposit_success
-    // Это предотвращает дублирование уведомлений
+    // ВАЖНО: Проверяем, не было ли уже отправлено уведомление (чтобы избежать дубликатов)
     if (statusOk && !updateResult?.skipped) {
       try {
+        // КРИТИЧЕСКИ ВАЖНО: Атомарная проверка - убеждаемся, что мы первые, кто обновляет статус
+        // Это предотвращает отправку уведомления дважды при параллельных вызовах
+        const notificationCheck = await prisma.$transaction(async (tx) => {
+          const currentRequest = await tx.request.findUnique({
+            where: { id: request.id },
+            select: {
+              status: true,
+              processedAt: true,
+              updatedAt: true,
+            },
+          })
+          
+          if (!currentRequest || currentRequest.status !== 'autodeposit_success') {
+            return { shouldSend: false, reason: 'status_not_autodeposit_success' }
+          }
+          
+          // Проверяем, не было ли уведомление уже отправлено (processedAt был обновлен недавно)
+          // Если processedAt был обновлен более 10 секунд назад, значит это не наш вызов
+          const processedAtTime = currentRequest.processedAt?.getTime() || 0
+          const now = Date.now()
+          const timeSinceProcessed = now - processedAtTime
+          
+          // Если processedAt был обновлен более 10 секунд назад, значит уведомление уже могло быть отправлено
+          if (timeSinceProcessed > 10000) {
+            return { shouldSend: false, reason: 'notification_already_sent' }
+          }
+          
+          return { shouldSend: true }
+        })
+        
+        if (!notificationCheck.shouldSend) {
+          console.log(`⚠️ [Auto-Deposit] Skipping notification for request ${request.id}: ${notificationCheck.reason}`)
+          return {
+            requestId: request.id,
+            success: statusOk && paymentOk,
+            statusUpdated: statusOk,
+            paymentLinked: paymentOk,
+          }
+        }
+        
         const fullRequest = await prisma.request.findUnique({
           where: { id: request.id },
           select: {
@@ -873,6 +913,17 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
             
             // Отправляем уведомление с задержкой, чтобы оно пришло после "Заявка отправлена!"
             setTimeout(async () => {
+              // Дополнительная проверка перед отправкой - убеждаемся, что статус все еще autodeposit_success
+              const finalCheck = await prisma.request.findUnique({
+                where: { id: request.id },
+                select: { status: true },
+              })
+              
+              if (finalCheck?.status !== 'autodeposit_success') {
+                console.log(`⚠️ [Auto-Deposit] Status changed before notification send, skipping for request ${request.id}`)
+                return
+              }
+              
               const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
                 `💰 Сумма: ${fullRequest.amount} сом\n` +
                 `🎰 Букмекер: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
