@@ -350,7 +350,7 @@ function DepositStep2Content() {
 
   const handleContinue = async () => {
     if (!accountId.trim()) {
-      alert('Введите ID аккаунта в букмекере')
+      alert('Введите ID аккаунта')
       return
     }
 
@@ -367,7 +367,7 @@ function DepositStep2Content() {
         
         // Проверяем результат функции (не состояние, которое обновляется асинхронно)
         if (checkResult === false) {
-          alert('Игрок с таким ID не найден в букмекере. Проверьте правильность введенного ID.')
+          alert('Игрок с таким ID не найден. Проверьте правильность введенного ID.')
           return
         }
         
@@ -403,7 +403,7 @@ function DepositStep2Content() {
     }
 
     if (!bookmaker) {
-      alert('Ошибка: не выбран букмекер')
+      alert('Ошибка: не выбран счет')
       return
     }
 
@@ -478,7 +478,7 @@ function DepositStep2Content() {
   const translations = {
     ru: {
       title: 'Пополнение счета',
-      accountId: 'ID аккаунта в букмекере',
+      accountId: 'ID аккаунта',
       accountIdPlaceholder: 'Введите ID аккаунта',
       amount: 'Сумма (сом)',
       amountPlaceholder: 'Введите сумму',
@@ -500,7 +500,7 @@ function DepositStep2Content() {
     },
     ky: {
       title: 'Эсепти толтуруу',
-      accountId: 'Букмекердин аккаунт ID',
+      accountId: 'Аккаунт ID',
       accountIdPlaceholder: 'ID киргизиңиз',
       amount: 'Сумма (сом)',
       amountPlaceholder: 'Сумманы киргизиңиз',
@@ -529,10 +529,10 @@ function DepositStep2Content() {
       <FixedHeaderControls />
       <h1 className="text-xl font-bold">{t.title}</h1>
       
-      {/* Информация о букмекере */}
+      {/* Информация о счете */}
       {bookmaker && (
         <section className="card space-y-2">
-          <div className="label">Букмекер</div>
+          <div className="label">Счет</div>
           <div className="text-white font-semibold text-lg">{getBookmakerName(bookmaker)}</div>
         </section>
       )}
@@ -570,7 +570,7 @@ function DepositStep2Content() {
         </div>
         {idValid === false && (
           <div className="text-red-400 text-xs">
-            Игрок с таким ID не найден в букмекере
+            Игрок с таким ID не найден
           </div>
         )}
         {idValid === true && needsIdCheck() && (

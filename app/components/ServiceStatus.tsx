@@ -38,7 +38,7 @@ export default function ServiceStatus({ service, children }: ServiceStatusProps)
     const messages = {
       deposits: 'Пополнение временно недоступно',
       withdrawals: 'Вывод временно недоступен',
-      casinos: 'Букмекеры временно недоступны'
+      casinos: 'Счета временно недоступны'
     }
 
     return (

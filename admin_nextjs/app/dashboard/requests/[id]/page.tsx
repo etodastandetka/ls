@@ -890,7 +890,9 @@ export default function RequestDetailPage() {
       }
       
       // Проверяем, что заявка еще не обработана (но разрешаем обработку api_error для повторной попытки)
-      if (request.status === 'completed' || request.status === 'approved') {
+      // Проверяем все возможные статусы, которые означают что заявка уже обработана
+      const processedStatuses = ['completed', 'approved', 'autodeposit_success', 'auto_completed']
+      if (processedStatuses.includes(request.status)) {
         alert(`Заявка уже обработана (статус: ${request.status}). Пожалуйста, обновите страницу.`)
         return
       }
@@ -1930,7 +1932,7 @@ export default function RequestDetailPage() {
         </div>
       </div>
 
-      {/* Список транзакций по ID букмекера */}
+      {/* Список транзакций по ID счета */}
       <div className="mx-4">
         <h3 className="text-lg font-semibold text-white mb-3">
           Транзакции {request.accountId && `(ID: ${request.accountId})`}
@@ -1951,7 +1953,7 @@ export default function RequestDetailPage() {
             <p className="text-gray-400">
               {request.accountId 
                 ? `Нет транзакций по ID: ${request.accountId}`
-                : 'ID букмекера не указан'}
+                : 'ID счета не указан'}
             </p>
           </div>
         )}

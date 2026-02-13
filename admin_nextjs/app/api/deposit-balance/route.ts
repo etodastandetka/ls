@@ -71,7 +71,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Защита от повторных пополнений - проверяем статус заявки
-    if (requestData.status === 'completed' || requestData.status === 'approved' || requestData.status === 'autodeposit_success') {
+    // Проверяем все возможные статусы, которые означают что заявка уже обработана
+    const processedStatuses = ['completed', 'approved', 'autodeposit_success', 'auto_completed']
+    if (processedStatuses.includes(requestData.status)) {
       console.warn(`⚠️ [Deposit Balance] Request ${requestId} already processed (status: ${requestData.status}), skipping deposit`)
       return NextResponse.json(
         createApiResponse(null, `Заявка уже обработана (статус: ${requestData.status}). Повторное пополнение невозможно.`),
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
       const closedDuration = formatDuration(requestData.createdAt, updatedRequest.processedAt || new Date())
       const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
         `💰 Сумма: ${amount} сом\n` +
-        `🎰 Букмекер: ${bookmaker.toUpperCase()}` +
+        `🎰 Счет: ${bookmaker.toUpperCase()}` +
         (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
       
       // Отправляем уведомление асинхронно, не блокируя ответ

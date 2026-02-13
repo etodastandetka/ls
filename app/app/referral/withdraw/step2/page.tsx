@@ -62,12 +62,12 @@ function ReferralWithdrawStep2Content() {
 
   const handleSubmit = async () => {
     if (!accountId.trim()) {
-      alert('Введите ID аккаунта в букмекере')
+      alert('Введите ID аккаунта')
       return
     }
 
     if (!bookmaker) {
-      alert('Ошибка: не выбран букмекер')
+      alert('Ошибка: не выбран счет')
       return
     }
 
@@ -245,8 +245,8 @@ function ReferralWithdrawStep2Content() {
   const translations = {
     ru: {
       title: 'Вывод средств',
-      subtitle: 'Введите ID аккаунта в букмекере',
-      accountId: 'ID аккаунта в букмекере',
+      subtitle: 'Введите ID аккаунта',
+      accountId: 'ID аккаунта',
       accountIdPlaceholder: 'Введите ID аккаунта',
       amount: 'Сумма вывода',
       submit: 'Отправить заявку',
@@ -281,9 +281,9 @@ function ReferralWithdrawStep2Content() {
           <p className="text-sm text-white/70">{t.subtitle}</p>
         </div>
 
-        {/* Информация о букмекере */}
+        {/* Информация о счете */}
         <div className="card space-y-2">
-          <div className="text-white/70 text-sm">Букмекер</div>
+          <div className="text-white/70 text-sm">Счет</div>
           <div className="text-white font-semibold text-lg">{getBookmakerName(bookmaker)}</div>
         </div>
 

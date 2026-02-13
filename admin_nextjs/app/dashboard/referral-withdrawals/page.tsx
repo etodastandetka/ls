@@ -437,7 +437,7 @@ export default function ReferralWithdrawalsPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-white/70 text-xs">Букмекер</div>
+                  <div className="text-white/70 text-xs">Счет</div>
                   <div className="text-white font-medium text-sm">
                     {getBookmakerName(request.bookmaker)}
                   </div>

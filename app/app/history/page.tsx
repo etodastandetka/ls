@@ -47,7 +47,7 @@ export default function HistoryPage(){
       amount: 'Сумма',
       status: 'Статус',
       date: 'Дата',
-      bookmaker: 'Букмекер',
+      bookmaker: 'Счет',
       backToMain: 'На главную',
       all: 'Все',
       confirmationCode: 'Код подтверждения'
@@ -95,7 +95,7 @@ export default function HistoryPage(){
       amount: 'Сумма',
       status: 'Статус',
       date: 'Күн',
-      bookmaker: 'Букмекер',
+      bookmaker: 'Счет',
       backToMain: '🔙 Башкы менюга',
       all: 'Баары',
       confirmationCode: 'Ырастоо коду'

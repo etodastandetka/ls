@@ -238,7 +238,7 @@ export default function WithdrawStep1() {
   const translations = {
     ru: {
       title: 'Вывод средств',
-      selectBookmaker: 'Выберите букмекер',
+      selectBookmaker: 'Выберите',
       next: 'Далее',
       back: 'Назад'
     },
@@ -250,7 +250,7 @@ export default function WithdrawStep1() {
     },
     ky: {
       title: 'Акчаны чыгаруу',
-      selectBookmaker: 'Букмекерди тандаңыз',
+      selectBookmaker: 'Тандаңыз',
       next: 'Кийинки',
       back: 'Артка'
     },
@@ -266,13 +266,13 @@ export default function WithdrawStep1() {
 
   const handleNext = () => {
     if (!bookmaker) {
-      alert('Выберите букмекер')
+      alert('Выберите счет')
       return
     }
     
     // Проверяем, не отключен ли выбранный букмекер
     if (disabledCasinos && disabledCasinos.includes(bookmaker)) {
-      alert('Этот букмекер временно недоступен для вывода. Выберите другого.')
+      alert('Этот счет временно недоступен для вывода. Выберите другой.')
       return
     }
     

@@ -926,7 +926,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
               
               const notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
                 `💰 Сумма: ${fullRequest.amount} сом\n` +
-                `🎰 Букмекер: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
+                `🎰 Счет: ${fullRequest.bookmaker?.toUpperCase() || 'N/A'}\n` +
                 `⏱ Закрыта за: 1с`
               
               // Отправляем уведомление напрямую через Telegram API

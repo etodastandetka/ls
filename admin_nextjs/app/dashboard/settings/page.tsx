@@ -328,9 +328,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Настройки букмекера */}
+      {/* Настройки счетов */}
       <div className="bg-gray-800 bg-opacity-50 rounded-xl p-4 mb-4 border border-gray-700 backdrop-blur-sm">
-        <h2 className="text-base font-bold text-white mb-4">Настройки букмекера</h2>
+        <h2 className="text-base font-bold text-white mb-4">Настройки счетов</h2>
         
         <div className="space-y-3">
           {(['1xbet', '1win', 'melbet', 'mostbet', 'winwin'] as const).map((casino) => (
@@ -350,10 +350,10 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Настройки депозитов и выводов по букмекерам */}
+      {/* Настройки депозитов и выводов по счетам */}
       <div className="bg-gray-800 bg-opacity-50 rounded-xl p-4 mb-4 border border-gray-700 backdrop-blur-sm">
-        <h2 className="text-base font-bold text-white mb-4">Управление депозитами и выводами по букмекерам</h2>
-        <p className="text-xs text-gray-400 mb-4">Контроль пополнений и выводов для каждого букмекера отдельно</p>
+        <h2 className="text-base font-bold text-white mb-4">Управление депозитами и выводами по счетам</h2>
+        <p className="text-xs text-gray-400 mb-4">Контроль пополнений и выводов для каждого счета отдельно</p>
         
         <div className="space-y-4">
           {(['1xbet', '1win', 'melbet', 'mostbet', 'winwin'] as const).map((bookmaker) => {
