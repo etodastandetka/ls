@@ -245,7 +245,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     // Это предотвращает дублирование пополнений в букмекере при параллельных вызовах
     const preCheckResult = await prisma.$transaction(async (tx) => {
       // Проверяем текущее состояние заявки и платежа атомарно
-      const [currentRequest, currentPayment, otherPayments] = await Promise.all([
+      const [currentRequest, currentPayment, otherPayments, allLinkedPayments] = await Promise.all([
         tx.request.findUnique({
           where: { id: request.id },
           select: { status: true, processedBy: true },
@@ -254,7 +254,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           where: { id: paymentId },
           select: { isProcessed: true, requestId: true },
         }),
-        // КРИТИЧЕСКИ ВАЖНО: Проверяем, нет ли у заявки ДРУГИХ платежей, которые уже обрабатываются или обработаны
+        // КРИТИЧЕСКИ ВАЖНО: Проверяем, нет ли у заявки ДРУГИХ платежей, которые уже обработаны
         // Это предотвращает обработку одной заявки несколькими платежами одновременно
         tx.incomingPayment.findMany({
           where: {
@@ -264,11 +264,37 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           },
           select: { id: true, isProcessed: true },
         }),
+        // КРИТИЧЕСКИ ВАЖНО: Проверяем, нет ли у заявки ДРУГИХ платежей, которые уже привязаны (даже если еще не обработаны)
+        // Это предотвращает параллельную обработку нескольких платежей для одной заявки
+        tx.incomingPayment.findMany({
+          where: {
+            requestId: request.id,
+            id: { not: paymentId }, // Исключаем текущий платеж
+          },
+          select: { id: true, isProcessed: true, requestId: true },
+        }),
       ])
       
       // Если платеж уже обработан - пропускаем
       if (currentPayment?.isProcessed) {
         return { skip: true, reason: 'payment_already_processed' }
+      }
+      
+      // КРИТИЧЕСКИ ВАЖНО: Если у заявки уже есть ДРУГОЙ платеж, который привязан к ней - пропускаем
+      // Это предотвращает параллельную обработку нескольких платежей для одной заявки
+      // Даже если платеж еще не обработан, но уже привязан - значит другой процесс его обрабатывает
+      if (allLinkedPayments && allLinkedPayments.length > 0) {
+        const processedCount = allLinkedPayments.filter(p => p.isProcessed).length
+        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already has ${allLinkedPayments.length} linked payment(s) (${processedCount} processed), skipping payment ${paymentId}`)
+        // Привязываем текущий платеж к заявке, но не обрабатываем его
+        await tx.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        return { skip: true, reason: 'request_already_has_linked_payment', paymentLinked: true }
       }
       
       // КРИТИЧЕСКИ ВАЖНО: Если у заявки уже есть ДРУГОЙ обработанный платеж - пропускаем
@@ -301,7 +327,45 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         return { skip: true, reason: 'request_already_processed', paymentLinked: true }
       }
       
-      return { skip: false }
+      // КРИТИЧЕСКИ ВАЖНО: Атомарно привязываем платеж к заявке ПЕРЕД вызовом depositToCasino
+      // Это гарантирует, что только один платеж сможет обработать заявку
+      // Используем updateMany с условием, чтобы гарантировать атомарность
+      const linkResult = await tx.incomingPayment.updateMany({
+        where: {
+          id: paymentId,
+          requestId: null, // Только если еще не привязан
+          isProcessed: false, // И еще не обработан
+        },
+        data: {
+          requestId: request.id, // Привязываем к заявке
+          updatedAt: new Date(), // Обновляем время для блокировки
+        },
+      })
+      
+      // Если не удалось привязать (count = 0) - значит платеж уже обрабатывается другим процессом
+      if (linkResult.count === 0) {
+        const checkPayment = await tx.incomingPayment.findUnique({
+          where: { id: paymentId },
+          select: { isProcessed: true, requestId: true },
+        })
+        
+        if (checkPayment?.isProcessed) {
+          console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} was processed by another process, skipping`)
+          return { skip: true, reason: 'payment_processed_by_another' }
+        }
+        
+        if (checkPayment?.requestId && checkPayment.requestId !== request.id) {
+          console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} is linked to another request ${checkPayment.requestId}, skipping`)
+          return { skip: true, reason: 'payment_linked_to_another_request' }
+        }
+        
+        console.log(`⚠️ [Auto-Deposit] Could not link payment ${paymentId} to request ${request.id} (already being processed)`)
+        return { skip: true, reason: 'payment_link_failed' }
+      }
+      
+      console.log(`✅ [Auto-Deposit] Payment ${paymentId} atomically linked to request ${request.id} before deposit`)
+      
+      return { skip: false, paymentLinked: true }
     })
     
     if (preCheckResult.skip) {
@@ -611,20 +675,38 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         }
       }
       
-      // Освобождаем блокировку платежа перед выбросом ошибки
-      await prisma.incomingPayment.update({
+      // ВАЖНО: Не сбрасываем requestId, если платеж уже привязан к заявке
+      // Это позволяет администратору увидеть, что платеж был связан с заявкой, но пополнение не удалось
+      // Платеж останется привязанным, но не будет помечен как обработанный
+      const currentPaymentState = await prisma.incomingPayment.findUnique({
         where: { id: paymentId },
-        data: {
-          requestId: null, // Сбрасываем временный маркер
-        },
+        select: { requestId: true, isProcessed: true },
       })
+      
+      // Сбрасываем requestId только если платеж не обработан и не привязан к другой заявке
+      if (currentPaymentState && !currentPaymentState.isProcessed && currentPaymentState.requestId === request.id) {
+        // Платеж привязан к этой заявке, но пополнение не удалось - оставляем привязанным для ручной обработки
+        console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} remains linked to request ${request.id} despite deposit failure (for manual review)`)
+      } else if (currentPaymentState && !currentPaymentState.isProcessed && currentPaymentState.requestId !== request.id) {
+        // Платеж привязан к другой заявке - не трогаем
+        console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} is linked to another request, not resetting`)
+      } else {
+        // Платеж не привязан или уже обработан - можно сбросить
+        await prisma.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: null, // Сбрасываем временный маркер только если платеж не привязан
+          },
+        })
+        console.log(`🔓 [Auto-Deposit] Released lock on payment ${paymentId} after error`)
+      }
       
       throw new Error(errorMessage)
     }
     
     // После успешного пополнения - атомарно обновляем все в одной транзакции
     // ВАЖНО: Если пополнение успешно, статус ОБЯЗАТЕЛЬНО должен обновиться на autodeposit_success
-    // ВАЖНО: Платеж ОБЯЗАТЕЛЬНО должен быть привязан к заявке
+    // ВАЖНО: Платеж уже привязан к заявке в preCheckResult, нужно только пометить его как обработанный
     // ВАЖНО: Используем транзакцию чтобы гарантировать что все обновится атомарно
     const updateResult = await prisma.$transaction(async (tx) => {
       // Проверяем текущее состояние заявки и платежа
@@ -640,39 +722,63 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       ])
       
       // КРИТИЧЕСКИ ВАЖНО: Если платеж уже обработан другим процессом - пропускаем (защита от двойного пополнения)
-      if (currentPayment?.isProcessed && currentPayment.requestId !== request.id) {
-        console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed by another process (requestId: ${currentPayment.requestId}), skipping`)
-        return { skipped: true, reason: 'payment_already_processed_by_another_process' }
+      if (currentPayment?.isProcessed) {
+        if (currentPayment.requestId !== request.id) {
+          console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed by another process (requestId: ${currentPayment.requestId}), skipping`)
+          return { skipped: true, reason: 'payment_already_processed_by_another_process' }
+        } else {
+          // Платеж уже обработан и привязан к этой заявке - значит другой процесс уже все сделал
+          console.log(`⚠️ [Auto-Deposit] Payment ${paymentId} already processed for request ${request.id} by another process, skipping`)
+          return { skipped: true, reason: 'payment_already_processed', paymentLinked: true }
+        }
       }
       
-      // Если заявка уже успешно обработана другим процессом - просто привязываем платеж
+      // КРИТИЧЕСКИ ВАЖНО: Проверяем, что платеж привязан к этой заявке (должен быть привязан в preCheckResult)
+      if (currentPayment?.requestId !== request.id) {
+        console.error(`❌ [Auto-Deposit] CRITICAL: Payment ${paymentId} is not linked to request ${request.id} (requestId: ${currentPayment?.requestId})`)
+        // Пытаемся привязать платеж атомарно
+        const linkResult = await tx.incomingPayment.updateMany({
+          where: {
+            id: paymentId,
+            requestId: null,
+            isProcessed: false,
+          },
+          data: {
+            requestId: request.id,
+          },
+        })
+        
+        if (linkResult.count === 0) {
+          console.error(`❌ [Auto-Deposit] Could not link payment ${paymentId} to request ${request.id}`)
+          return { skipped: true, reason: 'payment_link_failed' }
+        }
+      }
+      
+      // Если заявка уже успешно обработана другим процессом - просто помечаем платеж как обработанный
       if (currentRequest?.status === 'autodeposit_success' || 
           currentRequest?.status === 'completed' || 
           currentRequest?.status === 'approved' ||
           currentRequest?.status === 'auto_completed') {
-        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already processed (status: ${currentRequest.status}), but deposit was successful. Linking payment.`)
+        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already processed (status: ${currentRequest.status}), but deposit was successful. Marking payment as processed.`)
         await tx.incomingPayment.update({
           where: { id: paymentId },
           data: {
-            requestId: request.id,
             isProcessed: true,
           },
         })
         return { skipped: true, reason: 'request_already_processed', paymentLinked: true }
       }
       
-      // Если заявка уже обработана автопополнением - все равно привязываем платеж
+      // Если заявка уже обработана автопополнением - все равно помечаем платеж как обработанный
       if (currentRequest?.processedBy === 'автопополнение' || currentRequest?.status === 'autodeposit_success') {
-        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already processed by autodeposit (status: ${currentRequest?.status}), but linking payment anyway`)
-        // ВСЕГДА привязываем платеж к заявке, даже если заявка уже обработана
+        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already processed by autodeposit (status: ${currentRequest?.status}), but marking payment as processed anyway`)
         await tx.incomingPayment.update({
           where: { id: paymentId },
           data: {
-            requestId: request.id,
             isProcessed: true,
           },
         })
-        console.log(`✅ [Auto-Deposit] Payment ${paymentId} linked to request ${request.id} (request already processed)`)
+        console.log(`✅ [Auto-Deposit] Payment ${paymentId} marked as processed for request ${request.id} (request already processed)`)
         return { skipped: true, reason: 'request_already_processed', paymentLinked: true }
       }
       
@@ -695,16 +801,16 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           tx.incomingPayment.update({
             where: { id: paymentId },
             data: {
-              requestId: request.id,
               isProcessed: true,
             },
           }),
         ])
-        console.log(`✅ [Auto-Deposit] Request ${request.id} updated to autodeposit_success (was: ${currentRequest?.status}), payment ${paymentId} linked`)
+        console.log(`✅ [Auto-Deposit] Request ${request.id} updated to autodeposit_success (was: ${currentRequest?.status}), payment ${paymentId} marked as processed`)
         return { skipped: false, requestUpdated: true, paymentLinked: true }
       }
       
       // Обновляем заявку и платеж атомарно - ВАЖНО: это должно обязательно выполниться
+      // Платеж уже привязан к заявке в preCheckResult, нужно только пометить его как обработанный
       console.log(`🔄 [Auto-Deposit] Updating request ${request.id} and payment ${paymentId} in transaction...`)
       const [updatedRequest, updatedPayment] = await Promise.all([
         tx.request.update({
@@ -720,14 +826,13 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         tx.incomingPayment.update({
           where: { id: paymentId },
           data: {
-            requestId: request.id,
-            isProcessed: true,
+            isProcessed: true, // Платеж уже привязан в preCheckResult, только помечаем как обработанный
           },
         }),
       ])
       
       console.log(`✅ [Auto-Deposit] Transaction SUCCESS: Request ${request.id} status updated to autodeposit_success (was: ${currentRequest?.status})`)
-      console.log(`✅ [Auto-Deposit] Transaction SUCCESS: Payment ${paymentId} linked to request ${request.id} and marked as processed`)
+      console.log(`✅ [Auto-Deposit] Transaction SUCCESS: Payment ${paymentId} marked as processed (already linked to request ${request.id})`)
       
       return { updatedRequest, updatedPayment, skipped: false }
     })
