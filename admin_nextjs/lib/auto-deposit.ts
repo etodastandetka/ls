@@ -327,9 +327,45 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         return { skip: true, reason: 'request_already_processed', paymentLinked: true }
       }
       
-      // КРИТИЧЕСКИ ВАЖНО: Атомарно привязываем платеж к заявке ПЕРЕД вызовом depositToCasino
-      // Это гарантирует, что только один платеж сможет обработать заявку
-      // Используем updateMany с условием, чтобы гарантировать атомарность
+      // КРИТИЧЕСКИ ВАЖНО: Атомарно блокируем заявку ПЕРЕД вызовом depositToCasino
+      // Обновляем статус заявки на 'processing' чтобы другие процессы видели, что заявка уже обрабатывается
+      // Это гарантирует, что только один процесс сможет пополнить баланс
+      const lockRequestResult = await tx.request.updateMany({
+        where: {
+          id: request.id,
+          status: 'pending', // Только если заявка еще в статусе pending
+        },
+        data: {
+          status: 'processing' as any, // Временно ставим статус processing для блокировки
+          updatedAt: new Date(),
+        },
+      })
+      
+      // Если не удалось заблокировать заявку (count = 0) - значит она уже обрабатывается другим процессом
+      if (lockRequestResult.count === 0) {
+        const checkRequest = await tx.request.findUnique({
+          where: { id: request.id },
+          select: { status: true, processedBy: true },
+        })
+        
+        if (checkRequest?.status === 'autodeposit_success' || 
+            checkRequest?.status === 'completed' || 
+            checkRequest?.status === 'approved' ||
+            checkRequest?.status === 'auto_completed') {
+          console.log(`⚠️ [Auto-Deposit] Request ${request.id} already processed (status: ${checkRequest.status}), skipping`)
+          return { skip: true, reason: 'request_already_processed' }
+        }
+        
+        if (checkRequest?.status === 'processing') {
+          console.log(`⚠️ [Auto-Deposit] Request ${request.id} is being processed by another process, skipping`)
+          return { skip: true, reason: 'request_being_processed' }
+        }
+        
+        console.log(`⚠️ [Auto-Deposit] Could not lock request ${request.id} (status: ${checkRequest?.status})`)
+        return { skip: true, reason: 'request_lock_failed' }
+      }
+      
+      // Теперь атомарно привязываем платеж к заявке
       const linkResult = await tx.incomingPayment.updateMany({
         where: {
           id: paymentId,
@@ -344,6 +380,15 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       
       // Если не удалось привязать (count = 0) - значит платеж уже обрабатывается другим процессом
       if (linkResult.count === 0) {
+        // Откатываем блокировку заявки
+        await tx.request.update({
+          where: { id: request.id },
+          data: {
+            status: 'pending' as any,
+            updatedAt: new Date(),
+          },
+        })
+        
         const checkPayment = await tx.incomingPayment.findUnique({
           where: { id: paymentId },
           select: { isProcessed: true, requestId: true },
@@ -363,9 +408,9 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         return { skip: true, reason: 'payment_link_failed' }
       }
       
-      console.log(`✅ [Auto-Deposit] Payment ${paymentId} atomically linked to request ${request.id} before deposit`)
+      console.log(`✅ [Auto-Deposit] Request ${request.id} locked and payment ${paymentId} atomically linked before deposit`)
       
-      return { skip: false, paymentLinked: true }
+      return { skip: false, paymentLinked: true, requestLocked: true }
     })
     
     if (preCheckResult.skip) {
@@ -586,17 +631,54 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       }
     }
     
-    // Если заявка уже completed/approved, временно обновляем статус на pending,
-    // чтобы depositToCasino не считал её дубликатом
-    if (requestStatusBeforeDeposit?.status === 'completed' || requestStatusBeforeDeposit?.status === 'approved') {
-      console.log(`⚠️ [Auto-Deposit] Request ${request.id} already ${requestStatusBeforeDeposit.status}, temporarily updating to pending for deposit check`)
-      await prisma.request.update({
-        where: { id: request.id },
+    // КРИТИЧЕСКИ ВАЖНО: Проверяем, что заявка заблокирована (статус 'processing')
+    // Если нет - значит другой процесс уже обработал заявку
+    const lockedRequestCheck = await prisma.request.findUnique({
+      where: { id: request.id },
+      select: { status: true, processedBy: true },
+    })
+    
+    if (!lockedRequestCheck || lockedRequestCheck.status !== 'processing') {
+      console.log(`⚠️ [Auto-Deposit] Request ${request.id} is not locked (status: ${lockedRequestCheck?.status}), skipping deposit`)
+      
+      // Если заявка уже успешно обработана - привязываем платеж и выходим
+      if (lockedRequestCheck?.status === 'autodeposit_success' || 
+          lockedRequestCheck?.status === 'completed' || 
+          lockedRequestCheck?.status === 'approved' ||
+          lockedRequestCheck?.status === 'auto_completed') {
+        await prisma.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        return {
+          requestId: request.id,
+          success: true,
+          statusUpdated: false,
+          paymentLinked: true,
+          skipped: true,
+          reason: 'request_already_processed'
+        }
+      }
+      
+      // Если заявка не заблокирована и не обработана - откатываем привязку платежа
+      await prisma.incomingPayment.update({
+        where: { id: paymentId },
         data: {
-          status: 'pending' as any,
-          updatedAt: new Date(),
-        } as any,
+          requestId: null,
+        },
       })
+      
+      return {
+        requestId: request.id,
+        success: false,
+        statusUpdated: false,
+        paymentLinked: false,
+        skipped: true,
+        reason: 'request_not_locked'
+      }
     }
     
     // Сразу пополняем баланс через букмекер API (самое важное - делаем мгновенно)
@@ -645,16 +727,23 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         }
       }
       
-      // Восстанавливаем исходный статус если был изменен
-      if (requestStatusBeforeDeposit?.status === 'completed' || requestStatusBeforeDeposit?.status === 'approved') {
-        await prisma.request.update({
-          where: { id: request.id },
-          data: {
-            status: requestStatusBeforeDeposit.status as any,
-            updatedAt: new Date(),
-          } as any,
-        })
-      }
+      // КРИТИЧЕСКИ ВАЖНО: Откатываем блокировку заявки обратно на 'pending'
+      // Это позволяет другим процессам попробовать обработать заявку позже
+      await prisma.request.update({
+        where: { id: request.id },
+        data: {
+          status: 'pending' as any,
+          updatedAt: new Date(),
+        } as any,
+      })
+      
+      // Откатываем привязку платежа
+      await prisma.incomingPayment.update({
+        where: { id: paymentId },
+        data: {
+          requestId: null,
+        },
+      })
       
       // Сохраняем ошибку в БД для отображения в админке
       // НО только если заявка все еще в статусе pending
@@ -809,12 +898,23 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
         return { skipped: false, requestUpdated: true, paymentLinked: true }
       }
       
+      // КРИТИЧЕСКИ ВАЖНО: Проверяем, что заявка все еще в статусе 'processing'
+      // Это гарантирует, что только процесс, который заблокировал заявку, сможет обновить статус
+      if (currentRequest?.status !== 'processing') {
+        console.error(`❌ [Auto-Deposit] CRITICAL: Request ${request.id} is not in 'processing' status (current: ${currentRequest?.status}), cannot update to autodeposit_success`)
+        return { skipped: true, reason: 'request_not_in_processing_status' }
+      }
+      
       // Обновляем заявку и платеж атомарно - ВАЖНО: это должно обязательно выполниться
       // Платеж уже привязан к заявке в preCheckResult, нужно только пометить его как обработанный
-      console.log(`🔄 [Auto-Deposit] Updating request ${request.id} and payment ${paymentId} in transaction...`)
-      const [updatedRequest, updatedPayment] = await Promise.all([
-        tx.request.update({
-          where: { id: request.id },
+      // Используем updateMany с условием на статус 'processing' для атомарности
+      console.log(`🔄 [Auto-Deposit] Updating request ${request.id} from 'processing' to 'autodeposit_success' and marking payment ${paymentId} as processed...`)
+      const [updateRequestResult, updatedPayment] = await Promise.all([
+        tx.request.updateMany({
+          where: { 
+            id: request.id,
+            status: 'processing', // Только если заявка все еще в статусе processing
+          },
           data: {
             status: 'autodeposit_success',
             statusDetail: null,
@@ -830,6 +930,17 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           },
         }),
       ])
+      
+      // Проверяем, что обновление прошло успешно (count должен быть 1)
+      if (updateRequestResult.count === 0) {
+        console.error(`❌ [Auto-Deposit] CRITICAL: Failed to update request ${request.id} from 'processing' to 'autodeposit_success' (status may have changed)`)
+        return { skipped: true, reason: 'request_update_failed' }
+      }
+      
+      // Получаем обновленную заявку для возврата
+      const updatedRequest = await tx.request.findUnique({
+        where: { id: request.id },
+      })
       
       console.log(`✅ [Auto-Deposit] Transaction SUCCESS: Request ${request.id} status updated to autodeposit_success (was: ${currentRequest?.status})`)
       console.log(`✅ [Auto-Deposit] Transaction SUCCESS: Payment ${paymentId} marked as processed (already linked to request ${request.id})`)
