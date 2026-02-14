@@ -6,7 +6,6 @@ import Imap from 'imap'
 import { simpleParser } from 'mailparser'
 import { prisma } from './prisma'
 import { parseEmailByBank } from './email-parsers'
-import { matchAndProcessPayment } from './auto-deposit'
 import dns from 'dns'
 
 // Настраиваем надежные DNS серверы для избежания DNS ошибок
@@ -276,23 +275,11 @@ async function processEmail(
                 markSeen(`duplicate_processed:${duplicateCheck.existingPayment.id}`)
                 return
               } else {
-                console.log(`🔄 [Email Watcher] Existing payment ${duplicateCheck.existingPayment.id} not yet processed, attempting to find request for it...`)
-                // Пытаемся найти заявку для существующего платежа
-                try {
-                  const result = await matchAndProcessPayment(duplicateCheck.existingPayment.id, amount)
-                  if (result && result.success) {
-                    console.log(`✅ [Email Watcher] Found and processed request for existing payment ${duplicateCheck.existingPayment.id}, request ${result.requestId}`)
-                    markSeen(`duplicate_found_request:${duplicateCheck.existingPayment.id}:${result.requestId}`)
-                  } else {
-                    console.log(`ℹ️ [Email Watcher] No matching request found for existing payment ${duplicateCheck.existingPayment.id}`)
-                    // Платеж уже в БД, будет обработан позже при создании заявки
-                    // Помечаем email как прочитанный, чтобы не обрабатывать его снова
-                    markSeen(`duplicate_pending:${duplicateCheck.existingPayment.id}`)
-                  }
-                } catch (error: any) {
-                  console.error(`❌ [Email Watcher] Error processing existing payment ${duplicateCheck.existingPayment.id}:`, error.message)
-                  // НЕ помечаем email как прочитанный при ошибке
-                }
+                console.log(`ℹ️ [Email Watcher] Existing payment ${duplicateCheck.existingPayment.id} not yet processed`)
+                console.log(`   Payment will be processed automatically when matching request appears`)
+                // Платеж уже в БД, будет обработан позже при создании заявки
+                // Помечаем email как прочитанный, чтобы не обрабатывать его снова
+                markSeen(`duplicate_pending:${duplicateCheck.existingPayment.id}`)
                 return
               }
             }
@@ -309,45 +296,19 @@ async function processEmail(
             })
 
             console.log(`✅ IncomingPayment saved: ID ${incomingPayment.id}`)
-            console.log(`🔍 [Email Watcher] Starting auto-match for payment ${incomingPayment.id}, amount: ${amount}`)
-
-            // Пытаемся найти совпадение и автоматически пополнить баланс
-            // Используем правильную функцию из lib/auto-deposit.ts
-            let paymentProcessed = false
-            try {
-              const result = await matchAndProcessPayment(incomingPayment.id, amount)
-              if (result && result.success) {
-                console.log(`✅ [Email Watcher] Auto-deposit completed instantly for payment ${incomingPayment.id}, request ${result.requestId}`)
-                paymentProcessed = true
-              } else {
-                console.log(`ℹ️ [Email Watcher] No matching request found for payment ${incomingPayment.id} (amount: ${amount})`)
-              }
-            } catch (error: any) {
-              console.error(`❌ [Email Watcher] Auto-match failed for payment ${incomingPayment.id}:`, error.message)
-              // Не прерываем обработку, т.к. платеж уже сохранен и может быть обработан вручную
-            }
-
+            
+            // КРИТИЧЕСКИ ВАЖНО: Email Watcher НЕ вызывает matchAndProcessPayment
+            // Обработка происходит ТОЛЬКО при создании заявки через API /api/payment
+            // Это гарантирует один процесс обработки и предотвращает дублирование пополнений
+            // Платеж будет обработан автоматически когда появится соответствующая заявка
+            
             // КРИТИЧЕСКИ ВАЖНО: Помечаем email как прочитанный ПОСЛЕ создания платежа
-            // Платеж сохранен в БД и будет обработан позже через:
+            // Платеж сохранен в БД и будет обработан автоматически при создании заявки через:
             // 1. Автоматический поиск при создании новой заявки (app/api/payment/route.ts)
             // 2. Ручной вызов API /api/auto-deposit/match для проверки необработанных платежей
-            // Это предотвращает повторную обработку email, но платеж все равно будет обработан когда появится заявка
-            console.log(`✅ [Email Watcher] Payment ${incomingPayment.id} saved to database, marking email as read`)
-            if (paymentProcessed) {
-              const finalPayment = await prisma.incomingPayment.findUnique({
-                where: { id: incomingPayment.id },
-                select: { isProcessed: true, requestId: true },
-              })
-              if (finalPayment?.isProcessed && finalPayment.requestId) {
-                console.log(`   Payment already processed and linked to request ${finalPayment.requestId}`)
-                markSeen(`processed:${incomingPayment.id}:request:${finalPayment.requestId}`)
-              } else {
-                markSeen(`saved:${incomingPayment.id}`)
-              }
-            } else {
-              console.log(`   Payment will be processed later when matching request appears`)
-              markSeen(`saved:${incomingPayment.id}:pending`)
-            }
+            console.log(`✅ [Email Watcher] Payment ${incomingPayment.id} saved to database, will be processed when matching request appears`)
+            console.log(`   Payment will be processed automatically when user creates deposit request`)
+            markSeen(`saved:${incomingPayment.id}:pending`)
           } catch (error: any) {
             console.error(`❌ Error processing email (UID: ${uid}):`, error)
             reject(error)
@@ -364,8 +325,9 @@ async function processEmail(
   })
 }
 
-// Функция matchAndProcessPayment теперь импортируется из ./auto-deposit
-// Это гарантирует единую логику автопополнения во всем приложении
+// КРИТИЧЕСКИ ВАЖНО: Email Watcher НЕ вызывает matchAndProcessPayment
+// Обработка платежей происходит ТОЛЬКО при создании заявки через API /api/payment
+// Это гарантирует один процесс обработки и предотвращает дублирование пополнений
 
 /**
  * Проверка всех непрочитанных писем (для первого запуска после перезапуска)
