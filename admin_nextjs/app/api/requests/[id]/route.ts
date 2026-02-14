@@ -432,17 +432,78 @@ export async function PATCH(
           }
           
           if (notificationMessage) {
-            const source = requestBeforeUpdate.source || 'unknown'
-            console.log(`📤 [Request ${id}] Sending notification to user ${requestBeforeUpdate.userId}, status: ${body.status}, type: ${requestBeforeUpdate.requestType}, source: ${source}`)
+            // КРИТИЧЕСКИ ВАЖНО: Атомарная блокировка ПЕРЕД отправкой уведомления
+            // Обновляем updatedAt чтобы пометить, что мы отправляем уведомление
+            // Это предотвращает параллельную отправку уведомлений
+            const lockResult = await prisma.$transaction(async (tx) => {
+              const currentRequest = await tx.request.findUnique({
+                where: { id },
+                select: {
+                  status: true,
+                  updatedAt: true,
+                },
+              })
+              
+              if (!currentRequest || currentRequest.status !== body.status) {
+                return { shouldSend: false, reason: 'status_mismatch' }
+              }
+              
+              // Проверяем, не было ли уведомление уже отправлено (updatedAt был обновлен недавно)
+              const updatedAtTime = currentRequest.updatedAt?.getTime() || 0
+              const now = Date.now()
+              const timeSinceUpdated = now - updatedAtTime
+              
+              // Если updatedAt был обновлен менее 500ms назад, значит это параллельный вызов
+              // Ждем минимум 500ms после обновления статуса перед отправкой уведомления
+              if (timeSinceUpdated < 500 && timeSinceUpdated > 0) {
+                return { shouldSend: false, reason: 'parallel_call_detected' }
+              }
+              
+              // Если updatedAt был обновлен более 10 секунд назад, значит это старый вызов
+              if (timeSinceUpdated > 10000) {
+                return { shouldSend: false, reason: 'request_too_old' }
+              }
+              
+              // Атомарно обновляем updatedAt чтобы пометить, что мы отправляем уведомление
+              // Используем условие, что updatedAt был обновлен БОЛЕЕ 500ms назад
+              // Это гарантирует, что только один процесс сможет обновить и отправить уведомление
+              const fiveHundredMsAgo = new Date(now - 500)
+              const updateResult = await tx.request.updateMany({
+                where: {
+                  id,
+                  status: body.status,
+                  updatedAt: {
+                    lt: fiveHundredMsAgo, // Только если updatedAt был обновлен более 500ms назад
+                  },
+                },
+                data: {
+                  updatedAt: new Date(),
+                },
+              })
+              
+              // Если не удалось обновить (count = 0) - значит другой процесс уже обновляет или это параллельный вызов
+              if (updateResult.count === 0) {
+                return { shouldSend: false, reason: 'notification_already_being_sent' }
+              }
+              
+              return { shouldSend: true }
+            })
             
-            // Отправляем уведомление с обработкой ошибок
-            sendTelegramNotification(requestBeforeUpdate.userId, notificationMessage, false)
-              .then(() => {
-                console.log(`✅ [Request ${id}] Notification sent successfully to user ${requestBeforeUpdate.userId}`)
-              })
-              .catch(error => {
-                console.error(`❌ [Request ${id}] Failed to send notification to user ${requestBeforeUpdate.userId}:`, error)
-              })
+            if (!lockResult.shouldSend) {
+              console.log(`⚠️ [Request ${id}] Skipping notification: ${lockResult.reason}`)
+            } else {
+              const source = requestBeforeUpdate.source || 'unknown'
+              console.log(`📤 [Request ${id}] Sending notification to user ${requestBeforeUpdate.userId}, status: ${body.status}, type: ${requestBeforeUpdate.requestType}, source: ${source}`)
+              
+              // Отправляем уведомление с обработкой ошибок
+              sendTelegramNotification(requestBeforeUpdate.userId, notificationMessage, false)
+                .then(() => {
+                  console.log(`✅ [Request ${id}] Notification sent successfully to user ${requestBeforeUpdate.userId}`)
+                })
+                .catch(error => {
+                  console.error(`❌ [Request ${id}] Failed to send notification to user ${requestBeforeUpdate.userId}:`, error)
+                })
+            }
           } else {
             console.warn(`⚠️ [Request ${id}] No notification message generated for status: ${body.status}, type: ${requestBeforeUpdate.requestType}`)
           }
