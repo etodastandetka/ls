@@ -204,9 +204,65 @@ async function processEmail(
 
             const notificationSnippet = text.substring(0, 500)
 
-            // ВАЖНО: дубликаты отключены — сохраняем все письма как новые платежи
+            // КРИТИЧЕСКИ ВАЖНО: Проверяем на дубликаты ПЕРЕД созданием IncomingPayment
+            // Это предотвращает создание дубликатов при параллельной обработке одного email
+            // Используем транзакцию для атомарной проверки и создания
+            const duplicateCheck = await prisma.$transaction(async (tx) => {
+              // Проверяем дубликаты по сумме, банку и дате (окно ±5 минут)
+              const fiveMinutesAgo = new Date(paymentDate.getTime() - 5 * 60 * 1000)
+              const fiveMinutesLater = new Date(paymentDate.getTime() + 5 * 60 * 1000)
+              
+              const existingPayment = await tx.incomingPayment.findFirst({
+                where: {
+                  amount: amount,
+                  bank: bank,
+                  paymentDate: {
+                    gte: fiveMinutesAgo,
+                    lte: fiveMinutesLater,
+                  },
+                },
+                orderBy: {
+                  createdAt: 'desc',
+                },
+              })
 
-            // Создаем новый платеж только если его еще нет
+              if (existingPayment) {
+                return { isDuplicate: true, existingPayment }
+              }
+
+              // Дополнительная проверка: ищем платежи с такой же суммой, созданные в последние 2 минуты
+              // Это ловит случаи, когда email обрабатывается дважды почти одновременно
+              const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
+              const recentDuplicate = await tx.incomingPayment.findFirst({
+                where: {
+                  amount: amount,
+                  bank: bank,
+                  createdAt: {
+                    gte: twoMinutesAgo,
+                  },
+                },
+                orderBy: {
+                  createdAt: 'desc',
+                },
+              })
+
+              if (recentDuplicate) {
+                return { isDuplicate: true, existingPayment: recentDuplicate }
+              }
+
+              return { isDuplicate: false }
+            })
+
+            if (duplicateCheck.isDuplicate && duplicateCheck.existingPayment) {
+              console.log(`⚠️ [Email Watcher] Duplicate payment detected! Payment ${duplicateCheck.existingPayment.id} already exists with same amount (${amount}), bank (${bank}), and similar date`)
+              console.log(`   Existing payment date: ${duplicateCheck.existingPayment.paymentDate.toISOString()}, new payment date: ${paymentDate.toISOString()}`)
+              console.log(`   Skipping creation of duplicate payment for email UID ${uid}`)
+              // Помечаем email как прочитанный, но не создаем дубликат
+              markSeen(`duplicate:${duplicateCheck.existingPayment.id}`)
+              return
+            }
+
+            // Создаем новый платеж только если дубликата нет
             const incomingPayment = await prisma.incomingPayment.create({
               data: {
                 amount,
