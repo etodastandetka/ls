@@ -780,12 +780,23 @@ export async function POST(request: NextRequest) {
       const searchWindowStart = new Date(requestCreatedAt.getTime() - searchWindowMs) // 5 минут ДО создания заявки
       const searchWindowEnd = new Date(requestCreatedAt.getTime() + searchWindowMs) // 5 минут ПОСЛЕ создания заявки
       
+      // КРИТИЧЕСКИ ВАЖНО: Максимальный возраст платежа - не более 1 часа от текущего времени
+      // Это предотвращает привязку старых платежей (например, месяц назад) к новым заявкам
+      // даже если суммы совпадают с копейками
+      const maxPaymentAge = 60 * 60 * 1000 // 1 час
+      const minPaymentDate = new Date(Date.now() - maxPaymentAge)
+      
       console.log(`🔍 [Auto-Deposit] Searching payments in window: ${searchWindowStart.toISOString()} to ${searchWindowEnd.toISOString()} for request ${newRequest.id}`)
+      console.log(`   Max payment age: 1 hour (payments older than ${minPaymentDate.toISOString()} will be ignored)`)
       
       const incomingPayments = await prisma.incomingPayment.findMany({
         where: {
           isProcessed: false,
           amount: requestAmount,
+          // КРИТИЧЕСКИ ВАЖНО: Платеж не должен быть старше 1 часа
+          paymentDate: {
+            gte: minPaymentDate, // Платеж не старше 1 часа
+          },
           OR: [
             {
               // Платежи где paymentDate попадает в окно
@@ -812,8 +823,20 @@ export async function POST(request: NextRequest) {
         if (incomingPayments.length > 0) {
           const payment = incomingPayments[0]
           const timeDiff = requestCreatedAt.getTime() - payment.paymentDate.getTime()
-          const minutesDiff = Math.floor(Math.abs(timeDiff) / 60000)
+          const timeDiffAbs = Math.abs(timeDiff)
+          const minutesDiff = Math.floor(timeDiffAbs / 60000)
           const paymentDirection = timeDiff > 0 ? 'BEFORE' : 'AFTER'
+          
+          // КРИТИЧЕСКИ ВАЖНО: Дополнительная проверка - разница времени не должна превышать окно поиска
+          // Это защищает от привязки старых платежей, которые случайно попали в результаты
+          if (timeDiffAbs > searchWindowMs) {
+            console.log(`⚠️ [Auto-Deposit] Payment ${payment.id} time difference (${minutesDiff} minutes) exceeds search window (${Math.floor(searchWindowMs / 60000)} minutes), skipping`)
+            console.log(`   Payment date: ${payment.paymentDate.toISOString()}, Request created: ${requestCreatedAt.toISOString()}`)
+            // Платеж слишком старый или новый - не привязываем
+            scheduleDelayedNotification(newRequest.id)
+            return
+          }
+          
           console.log(`✅ [Auto-Deposit] Found matching payment ${payment.id} for NEW request ${newRequest.id}`)
           console.log(`   Payment ${paymentDirection} request by ${minutesDiff} minutes, processing INSTANTLY...`)
           console.log(`   Payment date: ${payment.paymentDate.toISOString()}, Request created: ${requestCreatedAt.toISOString()}`)

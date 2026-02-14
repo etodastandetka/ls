@@ -245,7 +245,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     // Это предотвращает дублирование пополнений в букмекере при параллельных вызовах
     const preCheckResult = await prisma.$transaction(async (tx) => {
       // Проверяем текущее состояние заявки и платежа атомарно
-      const [currentRequest, currentPayment] = await Promise.all([
+      const [currentRequest, currentPayment, otherPayments] = await Promise.all([
         tx.request.findUnique({
           where: { id: request.id },
           select: { status: true, processedBy: true },
@@ -254,11 +254,36 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           where: { id: paymentId },
           select: { isProcessed: true, requestId: true },
         }),
+        // КРИТИЧЕСКИ ВАЖНО: Проверяем, нет ли у заявки ДРУГИХ платежей, которые уже обрабатываются или обработаны
+        // Это предотвращает обработку одной заявки несколькими платежами одновременно
+        tx.incomingPayment.findMany({
+          where: {
+            requestId: request.id,
+            id: { not: paymentId }, // Исключаем текущий платеж
+            isProcessed: true, // Только обработанные платежи
+          },
+          select: { id: true, isProcessed: true },
+        }),
       ])
       
       // Если платеж уже обработан - пропускаем
       if (currentPayment?.isProcessed) {
         return { skip: true, reason: 'payment_already_processed' }
+      }
+      
+      // КРИТИЧЕСКИ ВАЖНО: Если у заявки уже есть ДРУГОЙ обработанный платеж - пропускаем
+      // Это предотвращает обработку одной заявки несколькими платежами
+      if (otherPayments && otherPayments.length > 0) {
+        console.log(`⚠️ [Auto-Deposit] Request ${request.id} already has ${otherPayments.length} processed payment(s) from other payment(s), skipping payment ${paymentId}`)
+        // Привязываем текущий платеж к заявке, но не обрабатываем его
+        await tx.incomingPayment.update({
+          where: { id: paymentId },
+          data: {
+            requestId: request.id,
+            isProcessed: true,
+          },
+        })
+        return { skip: true, reason: 'request_already_has_processed_payment', paymentLinked: true }
       }
       
       // Если заявка уже обработана автопополнением - пропускаем пополнение

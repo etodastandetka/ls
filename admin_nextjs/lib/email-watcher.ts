@@ -205,6 +205,7 @@ async function processEmail(
             const notificationSnippet = text.substring(0, 500)
 
             // КРИТИЧЕСКИ ВАЖНО: Проверяем на дубликаты ПЕРЕД созданием IncomingPayment
+            // Это предотвращает создание дубликатов при повторной обработке email (если заявка не найдена)
             // Это предотвращает создание дубликатов при параллельной обработке одного email
             // Используем транзакцию для атомарной проверки и создания
             const duplicateCheck = await prisma.$transaction(async (tx) => {
@@ -257,9 +258,38 @@ async function processEmail(
               console.log(`⚠️ [Email Watcher] Duplicate payment detected! Payment ${duplicateCheck.existingPayment.id} already exists with same amount (${amount}), bank (${bank}), and similar date`)
               console.log(`   Existing payment date: ${duplicateCheck.existingPayment.paymentDate.toISOString()}, new payment date: ${paymentDate.toISOString()}`)
               console.log(`   Skipping creation of duplicate payment for email UID ${uid}`)
-              // Помечаем email как прочитанный, но не создаем дубликат
-              markSeen(`duplicate:${duplicateCheck.existingPayment.id}`)
-              return
+              
+              // Если платеж уже обработан - помечаем email как прочитанный
+              // Если платеж еще не обработан - пытаемся найти заявку для него
+              const existingPayment = await prisma.incomingPayment.findUnique({
+                where: { id: duplicateCheck.existingPayment.id },
+                select: { isProcessed: true, requestId: true },
+              })
+              
+              if (existingPayment?.isProcessed && existingPayment.requestId) {
+                console.log(`✅ [Email Watcher] Existing payment ${duplicateCheck.existingPayment.id} already processed, marking email as read`)
+                markSeen(`duplicate_processed:${duplicateCheck.existingPayment.id}`)
+                return
+              } else {
+                console.log(`🔄 [Email Watcher] Existing payment ${duplicateCheck.existingPayment.id} not yet processed, attempting to find request for it...`)
+                // Пытаемся найти заявку для существующего платежа
+                try {
+                  const result = await matchAndProcessPayment(duplicateCheck.existingPayment.id, amount)
+                  if (result && result.success) {
+                    console.log(`✅ [Email Watcher] Found and processed request for existing payment ${duplicateCheck.existingPayment.id}, request ${result.requestId}`)
+                    markSeen(`duplicate_found_request:${duplicateCheck.existingPayment.id}:${result.requestId}`)
+                  } else {
+                    console.log(`ℹ️ [Email Watcher] No matching request found for existing payment ${duplicateCheck.existingPayment.id}`)
+                    // Платеж уже в БД, будет обработан позже при создании заявки
+                    // Помечаем email как прочитанный, чтобы не обрабатывать его снова
+                    markSeen(`duplicate_pending:${duplicateCheck.existingPayment.id}`)
+                  }
+                } catch (error: any) {
+                  console.error(`❌ [Email Watcher] Error processing existing payment ${duplicateCheck.existingPayment.id}:`, error.message)
+                  // НЕ помечаем email как прочитанный при ошибке
+                }
+                return
+              }
             }
 
             // Создаем новый платеж только если дубликата нет
@@ -278,10 +308,12 @@ async function processEmail(
 
             // Пытаемся найти совпадение и автоматически пополнить баланс
             // Используем правильную функцию из lib/auto-deposit.ts
+            let paymentProcessed = false
             try {
               const result = await matchAndProcessPayment(incomingPayment.id, amount)
               if (result && result.success) {
                 console.log(`✅ [Email Watcher] Auto-deposit completed instantly for payment ${incomingPayment.id}, request ${result.requestId}`)
+                paymentProcessed = true
               } else {
                 console.log(`ℹ️ [Email Watcher] No matching request found for payment ${incomingPayment.id} (amount: ${amount})`)
               }
@@ -290,10 +322,27 @@ async function processEmail(
               // Не прерываем обработку, т.к. платеж уже сохранен и может быть обработан вручную
             }
 
-            // СРАЗУ помечаем письмо как прочитанное ПОСЛЕ успешной обработки
-            // Это критично важно, чтобы не обрабатывать письмо повторно
-            // Используем setFlags вместо addFlags для более надежной установки флага
-            markSeen(`processed:${incomingPayment.id}`)
+            // КРИТИЧЕСКИ ВАЖНО: Помечаем email как прочитанный ПОСЛЕ создания платежа
+            // Платеж сохранен в БД и будет обработан позже через:
+            // 1. Автоматический поиск при создании новой заявки (app/api/payment/route.ts)
+            // 2. Ручной вызов API /api/auto-deposit/match для проверки необработанных платежей
+            // Это предотвращает повторную обработку email, но платеж все равно будет обработан когда появится заявка
+            console.log(`✅ [Email Watcher] Payment ${incomingPayment.id} saved to database, marking email as read`)
+            if (paymentProcessed) {
+              const finalPayment = await prisma.incomingPayment.findUnique({
+                where: { id: incomingPayment.id },
+                select: { isProcessed: true, requestId: true },
+              })
+              if (finalPayment?.isProcessed && finalPayment.requestId) {
+                console.log(`   Payment already processed and linked to request ${finalPayment.requestId}`)
+                markSeen(`processed:${incomingPayment.id}:request:${finalPayment.requestId}`)
+              } else {
+                markSeen(`saved:${incomingPayment.id}`)
+              }
+            } else {
+              console.log(`   Payment will be processed later when matching request appears`)
+              markSeen(`saved:${incomingPayment.id}:pending`)
+            }
           } catch (error: any) {
             console.error(`❌ Error processing email (UID: ${uid}):`, error)
             reject(error)
