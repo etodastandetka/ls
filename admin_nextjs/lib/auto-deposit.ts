@@ -460,9 +460,10 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
       }
     }
     
-    // Дополнительная проверка: проверяем, не было ли уже успешного пополнения для этого accountId и суммы в последние 5 минут
-    // Это защищает от повторных пополнений даже если заявка имеет статус pending
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    // Дополнительная проверка: проверяем, не было ли уже успешного пополнения для этого accountId и суммы в последние 2 минуты
+    // ВАЖНО: Уменьшено до 2 минут, чтобы не блокировать легитимные повторные пополнения
+    // Это защищает от повторных пополнений только в случае очень быстрого повторения
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
     const recentSuccessfulDeposits = await prisma.request.findMany({
       where: {
         accountId: String(request.accountId),
@@ -472,7 +473,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
           in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
         },
         processedAt: {
-          gte: fiveMinutesAgo
+          gte: twoMinutesAgo
         },
         id: {
           not: request.id // Исключаем текущую заявку
@@ -499,7 +500,7 @@ export async function matchAndProcessPayment(paymentId: number, amount: number) 
     
     if (duplicateDeposit) {
       const timeDiff = Math.floor((Date.now() - duplicateDeposit.processedAt!.getTime()) / 1000 / 60)
-      const remainingMinutes = Math.max(0, 5 - timeDiff)
+      const remainingMinutes = Math.max(0, 2 - timeDiff)
       console.warn(`⚠️ [Auto-Deposit] Duplicate deposit detected! Found recent successful deposit for accountId ${request.accountId}, amount ${requestAmount}, ${timeDiff} minutes ago (Request ID: ${duplicateDeposit.id}). Skipping.`)
       
       // Привязываем платеж к заявке, но не пытаемся пополнить баланс

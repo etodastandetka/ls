@@ -273,8 +273,10 @@ export async function depositToCasino(
   const normalizedBookmaker = bookmaker?.toLowerCase() || ''
 
   try {
-    // Проверка на дублирование пополнений - проверяем, не было ли уже пополнения для этого accountId и суммы в последние 5 минут
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+    // Проверка на дублирование пополнений - проверяем, не было ли уже пополнения для этого accountId и суммы в последние 2 минуты
+    // ВАЖНО: Уменьшено до 2 минут, чтобы не блокировать легитимные повторные пополнения
+    // Это защищает от дубликатов только в случае очень быстрого повторения
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
     
     // Ищем все недавние пополнения для этого accountId и bookmaker
     // Исключаем текущую заявку из проверки, если requestId передан
@@ -286,7 +288,7 @@ export async function depositToCasino(
         in: ['completed', 'approved', 'auto_completed', 'autodeposit_success']
       },
       processedAt: {
-        gte: fiveMinutesAgo
+        gte: twoMinutesAgo
       }
     }
     
@@ -317,7 +319,7 @@ export async function depositToCasino(
 
     if (duplicateDeposit) {
       const timeDiff = Math.floor((Date.now() - duplicateDeposit.processedAt!.getTime()) / 1000 / 60)
-      const remainingMinutes = Math.max(0, 5 - timeDiff)
+      const remainingMinutes = Math.max(0, 2 - timeDiff)
       console.warn(`[Deposit Balance] ⚠️ Duplicate deposit detected! Found recent deposit for accountId ${accountId}, amount ${amount}, ${timeDiff} minutes ago (Request ID: ${duplicateDeposit.id})`)
       return {
         success: false,

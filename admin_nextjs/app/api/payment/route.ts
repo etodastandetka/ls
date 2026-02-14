@@ -827,10 +827,12 @@ export async function POST(request: NextRequest) {
           const minutesDiff = Math.floor(timeDiffAbs / 60000)
           const paymentDirection = timeDiff > 0 ? 'BEFORE' : 'AFTER'
           
-          // КРИТИЧЕСКИ ВАЖНО: Дополнительная проверка - разница времени не должна превышать окно поиска
-          // Это защищает от привязки старых платежей, которые случайно попали в результаты
-          if (timeDiffAbs > searchWindowMs) {
-            console.log(`⚠️ [Auto-Deposit] Payment ${payment.id} time difference (${minutesDiff} minutes) exceeds search window (${Math.floor(searchWindowMs / 60000)} minutes), skipping`)
+          // КРИТИЧЕСКИ ВАЖНО: Дополнительная проверка - разница времени не должна превышать окно поиска более чем в 2 раза
+          // Это защищает от привязки старых платежей, но позволяет небольшие отклонения
+          // Увеличено до 2x окна для большей гибкости (10 минут вместо 5)
+          const maxTimeDiff = searchWindowMs * 2 // 10 минут вместо 5
+          if (timeDiffAbs > maxTimeDiff) {
+            console.log(`⚠️ [Auto-Deposit] Payment ${payment.id} time difference (${minutesDiff} minutes) exceeds max window (${Math.floor(maxTimeDiff / 60000)} minutes), skipping`)
             console.log(`   Payment date: ${payment.paymentDate.toISOString()}, Request created: ${requestCreatedAt.toISOString()}`)
             // Платеж слишком старый или новый - не привязываем
             scheduleDelayedNotification(newRequest.id)

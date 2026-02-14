@@ -213,10 +213,13 @@ async function processEmail(
               const fiveMinutesAgo = new Date(paymentDate.getTime() - 5 * 60 * 1000)
               const fiveMinutesLater = new Date(paymentDate.getTime() + 5 * 60 * 1000)
               
+              // Проверяем дубликаты, но только если существующий платеж еще не обработан
+              // Если платеж уже обработан - это не дубликат, это новый платеж с такой же суммой
               const existingPayment = await tx.incomingPayment.findFirst({
                 where: {
                   amount: amount,
                   bank: bank,
+                  isProcessed: false, // Только необработанные платежи считаются дубликатами
                   paymentDate: {
                     gte: fiveMinutesAgo,
                     lte: fiveMinutesLater,
@@ -231,13 +234,15 @@ async function processEmail(
                 return { isDuplicate: true, existingPayment }
               }
 
-              // Дополнительная проверка: ищем платежи с такой же суммой, созданные в последние 2 минуты
+              // Дополнительная проверка: ищем НЕОБРАБОТАННЫЕ платежи с такой же суммой, созданные в последние 2 минуты
               // Это ловит случаи, когда email обрабатывается дважды почти одновременно
+              // ВАЖНО: Проверяем только необработанные платежи, чтобы не блокировать легитимные повторные платежи
               const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
               const recentDuplicate = await tx.incomingPayment.findFirst({
                 where: {
                   amount: amount,
                   bank: bank,
+                  isProcessed: false, // Только необработанные платежи считаются дубликатами
                   createdAt: {
                     gte: twoMinutesAgo,
                   },
