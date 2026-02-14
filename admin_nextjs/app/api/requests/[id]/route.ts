@@ -357,15 +357,14 @@ export async function PATCH(
     if (body.status && successStatuses.includes(body.status)) {
       // Отправляем уведомление если есть userId (независимо от source)
       if (requestBeforeUpdate.userId) {
-        // КРИТИЧЕСКИ ВАЖНО: Атомарная проверка - убеждаемся, что мы первые, кто обновляет статус
-        // Это предотвращает отправку уведомления дважды при параллельных вызовах
+        // КРИТИЧЕСКИ ВАЖНО: Атомарная проверка - убеждаемся, что статус соответствует
+        // Это предотвращает отправку уведомления для неактуальных статусов
         const notificationCheck = await prisma.$transaction(async (tx) => {
           const currentRequest = await tx.request.findUnique({
             where: { id },
             select: {
               status: true,
               processedAt: true,
-              updatedAt: true,
             },
           })
           
@@ -373,23 +372,15 @@ export async function PATCH(
             return { shouldSend: false, reason: 'status_mismatch' }
           }
           
-          // Проверяем, не было ли уведомление уже отправлено (processedAt был обновлен недавно)
-          // Если processedAt был обновлен более 10 секунд назад, значит это не наш вызов
+          // Проверяем, что processedAt был обновлен недавно (не более 30 секунд назад)
+          // Это предотвращает отправку уведомлений для старых заявок
           const processedAtTime = currentRequest.processedAt?.getTime() || 0
           const now = Date.now()
           const timeSinceProcessed = now - processedAtTime
           
-          // Если processedAt был обновлен более 10 секунд назад, значит уведомление уже могло быть отправлено
-          if (timeSinceProcessed > 10000) {
-            return { shouldSend: false, reason: 'notification_already_sent' }
-          }
-          
-          // Проверяем updatedAt - если он был обновлен более 5 секунд назад, значит это не наш вызов
-          const updatedAtTime = currentRequest.updatedAt?.getTime() || 0
-          const timeSinceUpdated = now - updatedAtTime
-          
-          if (timeSinceUpdated > 5000) {
-            return { shouldSend: false, reason: 'request_already_updated' }
+          // Если processedAt был обновлен более 30 секунд назад, значит это старый вызов
+          if (timeSinceProcessed > 30000) {
+            return { shouldSend: false, reason: 'request_too_old' }
           }
           
           return { shouldSend: true }
@@ -432,78 +423,18 @@ export async function PATCH(
           }
           
           if (notificationMessage) {
-            // КРИТИЧЕСКИ ВАЖНО: Атомарная блокировка ПЕРЕД отправкой уведомления
-            // Обновляем updatedAt чтобы пометить, что мы отправляем уведомление
-            // Это предотвращает параллельную отправку уведомлений
-            const lockResult = await prisma.$transaction(async (tx) => {
-              const currentRequest = await tx.request.findUnique({
-                where: { id },
-                select: {
-                  status: true,
-                  updatedAt: true,
-                },
-              })
-              
-              if (!currentRequest || currentRequest.status !== body.status) {
-                return { shouldSend: false, reason: 'status_mismatch' }
-              }
-              
-              // Проверяем, не было ли уведомление уже отправлено (updatedAt был обновлен недавно)
-              const updatedAtTime = currentRequest.updatedAt?.getTime() || 0
-              const now = Date.now()
-              const timeSinceUpdated = now - updatedAtTime
-              
-              // Если updatedAt был обновлен менее 500ms назад, значит это параллельный вызов
-              // Ждем минимум 500ms после обновления статуса перед отправкой уведомления
-              if (timeSinceUpdated < 500 && timeSinceUpdated > 0) {
-                return { shouldSend: false, reason: 'parallel_call_detected' }
-              }
-              
-              // Если updatedAt был обновлен более 10 секунд назад, значит это старый вызов
-              if (timeSinceUpdated > 10000) {
-                return { shouldSend: false, reason: 'request_too_old' }
-              }
-              
-              // Атомарно обновляем updatedAt чтобы пометить, что мы отправляем уведомление
-              // Используем условие, что updatedAt был обновлен БОЛЕЕ 500ms назад
-              // Это гарантирует, что только один процесс сможет обновить и отправить уведомление
-              const fiveHundredMsAgo = new Date(now - 500)
-              const updateResult = await tx.request.updateMany({
-                where: {
-                  id,
-                  status: body.status,
-                  updatedAt: {
-                    lt: fiveHundredMsAgo, // Только если updatedAt был обновлен более 500ms назад
-                  },
-                },
-                data: {
-                  updatedAt: new Date(),
-                },
-              })
-              
-              // Если не удалось обновить (count = 0) - значит другой процесс уже обновляет или это параллельный вызов
-              if (updateResult.count === 0) {
-                return { shouldSend: false, reason: 'notification_already_being_sent' }
-              }
-              
-              return { shouldSend: true }
-            })
+            // Отправляем уведомление - первая проверка уже гарантирует, что это актуальный статус
+            const source = requestBeforeUpdate.source || 'unknown'
+            console.log(`📤 [Request ${id}] Sending notification to user ${requestBeforeUpdate.userId}, status: ${body.status}, type: ${requestBeforeUpdate.requestType}, source: ${source}`)
             
-            if (!lockResult.shouldSend) {
-              console.log(`⚠️ [Request ${id}] Skipping notification: ${lockResult.reason}`)
-            } else {
-              const source = requestBeforeUpdate.source || 'unknown'
-              console.log(`📤 [Request ${id}] Sending notification to user ${requestBeforeUpdate.userId}, status: ${body.status}, type: ${requestBeforeUpdate.requestType}, source: ${source}`)
-              
-              // Отправляем уведомление с обработкой ошибок
-              sendTelegramNotification(requestBeforeUpdate.userId, notificationMessage, false)
-                .then(() => {
-                  console.log(`✅ [Request ${id}] Notification sent successfully to user ${requestBeforeUpdate.userId}`)
-                })
-                .catch(error => {
-                  console.error(`❌ [Request ${id}] Failed to send notification to user ${requestBeforeUpdate.userId}:`, error)
-                })
-            }
+            // Отправляем уведомление с обработкой ошибок
+            sendTelegramNotification(requestBeforeUpdate.userId, notificationMessage, false)
+              .then(() => {
+                console.log(`✅ [Request ${id}] Notification sent successfully to user ${requestBeforeUpdate.userId}`)
+              })
+              .catch(error => {
+                console.error(`❌ [Request ${id}] Failed to send notification to user ${requestBeforeUpdate.userId}:`, error)
+              })
           } else {
             console.warn(`⚠️ [Request ${id}] No notification message generated for status: ${body.status}, type: ${requestBeforeUpdate.requestType}`)
           }
