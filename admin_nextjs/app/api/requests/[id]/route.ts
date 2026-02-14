@@ -357,53 +357,95 @@ export async function PATCH(
     if (body.status && successStatuses.includes(body.status)) {
       // Отправляем уведомление если есть userId (независимо от source)
       if (requestBeforeUpdate.userId) {
-        let notificationMessage = ''
-        
-        const isAutoDepositStatus = body.status === 'autodeposit_success' || body.status === 'auto_completed'
-        const closedDuration = isAutoDepositStatus
-          ? '1с'
-          : formatDuration(
-              requestBeforeUpdate.createdAt,
-              updateData.processedAt || updatedRequest.processedAt || new Date()
-            )
-
-        if (body.status === 'completed' || body.status === 'approved' || body.status === 'autodeposit_success' || body.status === 'auto_completed') {
-          if (requestBeforeUpdate.requestType === 'deposit') {
-            notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
-              `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-              `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
-              (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
-          } else if (requestBeforeUpdate.requestType === 'withdraw') {
-            notificationMessage = `✅ <b>Заявка на вывод одобрена!</b>\n\n` +
-              `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-              `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
-              (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
-          }
-        } else if (body.status === 'rejected') {
-          notificationMessage = `❌ <b>Заявка отклонена</b>\n\n` +
-            `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
-            `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
-            (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
+        // КРИТИЧЕСКИ ВАЖНО: Атомарная проверка - убеждаемся, что мы первые, кто обновляет статус
+        // Это предотвращает отправку уведомления дважды при параллельных вызовах
+        const notificationCheck = await prisma.$transaction(async (tx) => {
+          const currentRequest = await tx.request.findUnique({
+            where: { id },
+            select: {
+              status: true,
+              processedAt: true,
+              updatedAt: true,
+            },
+          })
           
-          if (body.statusDetail) {
-            notificationMessage += `\n\nПричина: ${body.statusDetail}`
+          if (!currentRequest || currentRequest.status !== body.status) {
+            return { shouldSend: false, reason: 'status_mismatch' }
           }
-        }
-        
-        if (notificationMessage) {
-          const source = requestBeforeUpdate.source || 'unknown'
-          console.log(`📤 [Request ${id}] Sending notification to user ${requestBeforeUpdate.userId}, status: ${body.status}, type: ${requestBeforeUpdate.requestType}, source: ${source}`)
           
-          // Отправляем уведомление с обработкой ошибок
-          sendTelegramNotification(requestBeforeUpdate.userId, notificationMessage, false)
-            .then(() => {
-              console.log(`✅ [Request ${id}] Notification sent successfully to user ${requestBeforeUpdate.userId}`)
-            })
-            .catch(error => {
-              console.error(`❌ [Request ${id}] Failed to send notification to user ${requestBeforeUpdate.userId}:`, error)
-            })
+          // Проверяем, не было ли уведомление уже отправлено (processedAt был обновлен недавно)
+          // Если processedAt был обновлен более 10 секунд назад, значит это не наш вызов
+          const processedAtTime = currentRequest.processedAt?.getTime() || 0
+          const now = Date.now()
+          const timeSinceProcessed = now - processedAtTime
+          
+          // Если processedAt был обновлен более 10 секунд назад, значит уведомление уже могло быть отправлено
+          if (timeSinceProcessed > 10000) {
+            return { shouldSend: false, reason: 'notification_already_sent' }
+          }
+          
+          // Проверяем updatedAt - если он был обновлен более 5 секунд назад, значит это не наш вызов
+          const updatedAtTime = currentRequest.updatedAt?.getTime() || 0
+          const timeSinceUpdated = now - updatedAtTime
+          
+          if (timeSinceUpdated > 5000) {
+            return { shouldSend: false, reason: 'request_already_updated' }
+          }
+          
+          return { shouldSend: true }
+        })
+        
+        if (!notificationCheck.shouldSend) {
+          console.log(`⚠️ [Request ${id}] Skipping notification: ${notificationCheck.reason}`)
         } else {
-          console.warn(`⚠️ [Request ${id}] No notification message generated for status: ${body.status}, type: ${requestBeforeUpdate.requestType}`)
+          let notificationMessage = ''
+          
+          const isAutoDepositStatus = body.status === 'autodeposit_success' || body.status === 'auto_completed'
+          const closedDuration = isAutoDepositStatus
+            ? '1с'
+            : formatDuration(
+                requestBeforeUpdate.createdAt,
+                updateData.processedAt || updatedRequest.processedAt || new Date()
+              )
+
+          if (body.status === 'completed' || body.status === 'approved' || body.status === 'autodeposit_success' || body.status === 'auto_completed') {
+            if (requestBeforeUpdate.requestType === 'deposit') {
+              notificationMessage = `✅ <b>Ваш баланс пополнен!</b>\n\n` +
+                `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
+                `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+                (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
+            } else if (requestBeforeUpdate.requestType === 'withdraw') {
+              notificationMessage = `✅ <b>Заявка на вывод одобрена!</b>\n\n` +
+                `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
+                `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+                (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
+            }
+          } else if (body.status === 'rejected') {
+            notificationMessage = `❌ <b>Заявка отклонена</b>\n\n` +
+              `💰 Сумма: ${requestBeforeUpdate.amount} сом\n` +
+              `🎰 Букмекер: ${requestBeforeUpdate.bookmaker?.toUpperCase() || 'N/A'}` +
+              (closedDuration ? `\n⏱ Закрыта за: ${closedDuration}` : '')
+            
+            if (body.statusDetail) {
+              notificationMessage += `\n\nПричина: ${body.statusDetail}`
+            }
+          }
+          
+          if (notificationMessage) {
+            const source = requestBeforeUpdate.source || 'unknown'
+            console.log(`📤 [Request ${id}] Sending notification to user ${requestBeforeUpdate.userId}, status: ${body.status}, type: ${requestBeforeUpdate.requestType}, source: ${source}`)
+            
+            // Отправляем уведомление с обработкой ошибок
+            sendTelegramNotification(requestBeforeUpdate.userId, notificationMessage, false)
+              .then(() => {
+                console.log(`✅ [Request ${id}] Notification sent successfully to user ${requestBeforeUpdate.userId}`)
+              })
+              .catch(error => {
+                console.error(`❌ [Request ${id}] Failed to send notification to user ${requestBeforeUpdate.userId}:`, error)
+              })
+          } else {
+            console.warn(`⚠️ [Request ${id}] No notification message generated for status: ${body.status}, type: ${requestBeforeUpdate.requestType}`)
+          }
         }
       } else {
         console.log(`⚠️ [Request ${id}] Skipping notification - no userId`)
